@@ -1,16 +1,24 @@
-# mideas_touch
+# Midas’s Touch
 
-A new Flutter project.
+Flutter/Dart mobile implementation of the supplied HTML artifact with Bloc/Cubit, GetIt, Freezed, Supabase Auth, PostgreSQL and Storage.
 
-## Getting Started
+Run using the existing project's local configuration:
 
-This project is a starting point for a Flutter application.
+```sh
+flutter pub get
+flutter run --dart-define-from-file=config/supabase.json
+```
 
-A few resources to get you started if this is your first Flutter project:
+VS Code's **Midas’s Touch** launch configuration supplies the same file. `config/supabase.json` is ignored by Git; it contains only the API URL and publishable key. Create it from `config/supabase.example.json` for a fresh checkout.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+**Inspect the existing Supabase database before applying SQL.** [Inspection queries](docs/database-inspection.sql) and a guarded baseline/seed in [supabase_schema.sql](supabase_schema.sql) are prepared. No remote changes have been applied. A management connection is required to inspect and adapt the migration to existing tables.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+[Implementation, setup and remaining integration work](docs/IMPLEMENTATION.md) · [Original artifact](docs/artifact-reference.html) · [Extracted original data](supabase/seed/artifact.json)
+
+```sh
+flutter analyze
+flutter test
+flutter build apk --debug --dart-define-from-file=config/supabase.json
+```
+
+The tests cover original-data serialization, immutable models, error behavior, editor history/persistence, and phone widths of 320, 390 and 430 pixels. The source's payments and social rewards are demos; server-side demo crediting is disabled by default.

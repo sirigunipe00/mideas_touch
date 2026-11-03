@@ -1,30 +1,80 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mideas_touch/app/app.dart';
+import 'package:mideas_touch/ui/overlays/overlays.dart';
+import 'package:mideas_touch/ui/screens/home_screen.dart';
+import 'package:mideas_touch/ui/screens/my_designs_screen.dart';
+import 'package:mideas_touch/ui/screens/profile_screen.dart';
+import 'package:mideas_touch/ui/screens/search_screen.dart';
 
-import 'package:mideas_touch/main.dart';
+Future<void> _boot(WidgetTester t) async {
+  t.view.physicalSize = const Size(430 * 2, 900 * 2);
+  t.view.devicePixelRatio = 2;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(const MideaTouchApp());
+}
+
+/// Dismisses the splash and lets the intro card finish sliding in.
+Future<void> _toIntro(WidgetTester t) async {
+  await t.pump(const Duration(seconds: 4));
+  await _settle(t);
+}
+
+/// Lets a screen / sheet transition finish (the app has endless animations,
+/// so `pumpAndSettle` cannot be used).
+Future<void> _settle(WidgetTester t) async {
+  await t.pump();
+  await t.pump(const Duration(milliseconds: 700));
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('splash, intro, then the home screen', (t) async {
+    await _boot(t);
+    expect(find.byType(SplashOverlay), findsOneWidget);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await _toIntro(t);
+    expect(find.byType(SplashOverlay), findsNothing);
+      expect(find.text('Welcome to Midas\'s Touch'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await t.tap(find.text('Start exploring'));
+    await _settle(t);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.text('Popular Designs'), findsOneWidget);
+    expect(find.text('Diwali Sale'), findsWidgets);
+  }); 
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('bottom tabs switch screens', (t) async {
+    await _boot(t);
+    await _toIntro(t);
+    await t.tap(find.text('Start exploring'));
+    await _settle(t);
+
+    await t.tap(find.text('Search'));
+    await _settle(t);
+    expect(find.byType(SearchScreen), findsOneWidget);
+
+    await t.tap(find.text('My Designs'));
+    await _settle(t);
+    expect(find.byType(MyDesignsScreen), findsOneWidget);
+
+    await t.tap(find.text('Profile'));
+    await _settle(t);
+    expect(find.byType(ProfileScreen), findsOneWidget);
+  });
+
+  testWidgets('customising asks to register, then to get coins', (t) async {
+    await _boot(t);
+    await _toIntro(t);
+    await t.tap(find.text('Start exploring'));
+    await _settle(t);
+
+    await t.tap(find.text('Start Creating').last);
+    await _settle(t);
+    expect(find.text('Create your account'), findsOneWidget);
+
+    await t.tap(find.text('Create Account'));
+    await _settle(t);
+    expect(find.text('Get coins'), findsOneWidget);
+    await t.pump(const Duration(seconds: 3));
   });
 }
