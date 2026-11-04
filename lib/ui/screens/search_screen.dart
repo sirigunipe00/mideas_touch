@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../widgets/common.dart';
@@ -64,10 +63,20 @@ class _Results extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loading = context.select<NavCubit, bool>((c) => c.state.loading);
+    final navLoading = context.select<NavCubit, bool>((c) => c.state.loading);
     final cat = context.watch<CatalogCubit>().state;
     final pal = context.pal;
-    if (loading) {
+    if (cat.status == CatalogStatus.error) {
+      return ListView(padding: EdgeInsets.zero, children: [
+        EmptyState(
+          title: 'Couldn’t load designs',
+          message: cat.error,
+          buttonLabel: 'Try again',
+          onButton: context.read<CatalogCubit>().load,
+        ),
+      ]);
+    }
+    if (navLoading || cat.loading) {
       return ListView(padding: EdgeInsets.zero, children: const [
         CardRow(
           padding: EdgeInsets.all(16),
@@ -82,7 +91,8 @@ class _Results extends StatelessWidget {
     final designs = cat.templates
         .where((d) => ('${d.name}${d.cat}${d.desc}').toLowerCase().contains(q))
         .toList();
-    final assets = matchingAssetIndexes(q);
+    final stock = cat.assets;
+    final assets = matchingAssetIndexes(stock, q);
     if (designs.isEmpty && assets.isEmpty) {
       return ListView(padding: EdgeInsets.zero, children: const [
         EmptyState(title: 'No designs found', message: 'Try another search.'),
@@ -110,7 +120,7 @@ class _Results extends StatelessWidget {
       if (assets.isNotEmpty)
         ArtifactGrid(columns: 4, children: [
           for (final i in assets)
-            AssetCell(Catalog.assets[i].emoji,
+            AssetCell(stock[i].emoji,
                 onTap: () => context.app.toast('Open the editor to add this image')),
         ])
       else

@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
 import '../../models/design_element.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/editor_cubit.dart';
@@ -224,6 +223,7 @@ class _ToolPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final pal = context.pal;
     final cubit = context.read<EditorCubit>();
+    final stock = context.watch<CatalogCubit>().state.assets;
     Widget body;
     switch (st.tool!) {
       case EditorTool.text:
@@ -249,10 +249,7 @@ class _ToolPanel extends StatelessWidget {
         ]);
       case EditorTool.images:
         final q = st.assetQuery.toLowerCase();
-        final matches = [
-          for (var i = 0; i < Catalog.assets.length; i++)
-            if (Catalog.assets[i].keywords.contains(q)) i
-        ];
+        final matches = matchingAssetIndexes(stock, q);
         body = Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -272,8 +269,9 @@ class _ToolPanel extends StatelessWidget {
           else
             ArtifactGrid(columns: 4, children: [
               for (final i in matches)
-                AssetCell(Catalog.assets[i].emoji,
-                    fontSize: 24, onTap: () => cubit.addStockImage(i)),
+                AssetCell(stock[i].emoji,
+                    fontSize: 24,
+                    onTap: () => cubit.addStockImage(stock[i].emoji)),
             ]),
         ]);
       case EditorTool.elements:
@@ -287,7 +285,7 @@ class _ToolPanel extends StatelessWidget {
         ]);
       case EditorTool.background:
         body = ArtifactGrid(columns: 6, children: [
-          for (final b in Catalog.backgrounds)
+          for (final b in context.watch<CatalogCubit>().state.backgrounds)
             Tap(
               onTap: () => cubit.setBackground(b),
               child: Container(
@@ -370,9 +368,13 @@ class _PropertyPanel extends StatelessWidget {
               columns: 6,
               padding: EdgeInsets.zero,
               children: [
-                for (var i = 0; i < 6; i++)
-                  AssetCell(Catalog.assets[i].emoji,
-                      fontSize: 20, onTap: () => cubit.addStockImage(i)),
+                for (final a in context
+                    .read<CatalogCubit>()
+                    .state
+                    .assets
+                    .take(6))
+                  AssetCell(a.emoji,
+                      fontSize: 20, onTap: () => cubit.addStockImage(a.emoji)),
               ],
             ),
           ],
@@ -417,7 +419,7 @@ class _PropertyPanel extends StatelessWidget {
           icon: Text('▾', style: TextStyle(color: pal.mu)),
           onSelected: (v) => cubit.updateSelected((x) => x.copyWith(font: v)),
           itemBuilder: (_) => [
-            for (final f in Catalog.fonts)
+            for (final f in context.read<CatalogCubit>().state.fonts)
               PopupMenuItem(
                   value: f,
                   child: Text(f,

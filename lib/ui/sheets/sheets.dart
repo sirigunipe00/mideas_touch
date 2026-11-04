@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/editor_cubit.dart';
 import '../../state/nav_cubit.dart';
@@ -179,8 +178,26 @@ class _SheetBody extends StatelessWidget {
   }
 }
 
-class _RegisterContent extends StatelessWidget {
+class _RegisterContent extends StatefulWidget {
   const _RegisterContent();
+
+  @override
+  State<_RegisterContent> createState() => _RegisterContentState();
+}
+
+class _RegisterContentState extends State<_RegisterContent> {
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  void _submit() =>
+      context.app.submitAuth(email: _email.text, password: _password.text);
 
   @override
   Widget build(BuildContext context) {
@@ -200,13 +217,21 @@ class _RegisterContent extends StatelessWidget {
             value: s.fullName, hint: 'Full name', onChanged: session.setFullName),
         const SizedBox(height: 10),
       ],
-      const AppField(
-          hint: 'Email', keyboardType: TextInputType.emailAddress),
+      AppField(
+          controller: _email,
+          hint: 'Email',
+          keyboardType: TextInputType.emailAddress),
       const SizedBox(height: 10),
-      const AppField(hint: 'Password', obscure: true),
+      AppField(
+          controller: _password,
+          hint: 'Password',
+          obscure: true,
+          onSubmitted: (_) => _submit()),
       const SizedBox(height: 6),
-      AppButton(reg ? 'Create Account' : 'Login',
-          wide: true, onTap: context.app.signIn),
+      AppButton(
+          s.busy ? 'Please wait…' : (reg ? 'Create Account' : 'Login'),
+          wide: true,
+          onTap: s.busy ? null : _submit),
     ]);
   }
 }
@@ -558,7 +583,7 @@ class _ImageSearchContent extends StatelessWidget {
       const SheetText(
           'Pick a sample image to find similar designs and assets. Uploads are not available in Phase 1.'),
       ArtifactGrid(columns: 4, padding: EdgeInsets.zero, children: [
-        for (final a in Catalog.assets.take(8))
+        for (final a in context.read<CatalogCubit>().state.assets.take(8))
           AssetCell(a.emoji,
               onTap: () => context.app.chooseCategory(a.keywords.split(' ').first)),
       ]),

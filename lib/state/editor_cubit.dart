@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter/painting.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/canvas/geometry.dart';
-import '../data/catalog.dart';
 import '../models/design_element.dart';
 import '../models/design_model.dart';
 
@@ -12,9 +11,10 @@ enum EditorTool { designs, text, images, elements, background }
 
 /// An undo/redo snapshot (`snap()` in the artifact).
 class EditorSnapshot {
-  const EditorSnapshot(this.bg, this.bi, this.els);
+  const EditorSnapshot(this.bg, this.bi, this.biPath, this.els);
   final List<Color> bg;
   final Uint8List? bi;
+  final String? biPath;
   final List<DesignElement> els;
 }
 
@@ -120,10 +120,15 @@ class EditorCubit extends Cubit<EditorState> {
 
   DesignModel get _d => state.design!;
 
-  EditorSnapshot _snap() => EditorSnapshot(_d.bg, _d.bi, _d.els);
+  EditorSnapshot _snap() => EditorSnapshot(_d.bg, _d.bi, _d.biPath, _d.els);
 
   void _applySnap(EditorSnapshot s) => emit(state.copyWith(
-      design: _d.copyWith(bg: s.bg, bi: s.bi, clearBi: s.bi == null, els: s.els),
+      design: _d.copyWith(
+          bg: s.bg,
+          bi: s.bi,
+          biPath: s.biPath,
+          clearBi: s.bi == null,
+          els: s.els),
       selected: -1));
 
   /// Records an undo point (`H()`).
@@ -252,8 +257,7 @@ class EditorCubit extends Cubit<EditorState> {
   }
 
   /// `addImg(i)`: swap the emoji of the selected image or add a new one.
-  void addStockImage(int assetIndex) {
-    final emoji = Catalog.assets[assetIndex].emoji;
+  void addStockImage(String emoji) {
     final e = state.selectedElement;
     if (e != null && e.isImage) {
       updateSelected((e) => e.copyWith(emoji: emoji, clearImage: true));
@@ -276,6 +280,8 @@ class EditorCubit extends Cubit<EditorState> {
       design: _d.copyWith(
           bg: template.bg,
           bi: template.bi,
+          biPath: template.biPath,
+          sourceId: template.id,
           clearBi: template.bi == null,
           els: template.els),
       selected: -1,

@@ -3,8 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/constants/layout.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
+import '../../models/catalog_models.dart';
 import '../../models/design_model.dart';
+import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../../state/session_cubit.dart';
 import '../../state/settings_cubit.dart';
@@ -320,7 +321,8 @@ class DesignSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loading = context.select<NavCubit, bool>((c) => c.state.loading);
+    final loading = context.select<NavCubit, bool>((c) => c.state.loading) ||
+        context.select<CatalogCubit, bool>((c) => c.state.loading);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SectionTitle(title),
       if (loading)
@@ -423,10 +425,10 @@ class MutedText extends StatelessWidget {
 }
 
 /// Convenience for stock-asset lookups.
-List<int> matchingAssetIndexes(String query) {
+List<int> matchingAssetIndexes(List<StockAsset> assets, String query) {
   final q = query.toLowerCase();
   return [
-    for (var i = 0; i < Catalog.assets.length; i++)
-      if (Catalog.assets[i].keywords.contains(q)) i
+    for (var i = 0; i < assets.length; i++)
+      if (assets[i].keywords.contains(q)) i
   ];
 }

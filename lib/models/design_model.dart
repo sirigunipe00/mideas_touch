@@ -12,6 +12,8 @@ class DesignModel {
     this.desc = '',
     required this.bg,
     this.bi,
+    this.biPath,
+    this.sourceId,
     this.by = 'Studio Team',
     this.pm = false,
     this.cost = 0,
@@ -30,6 +32,12 @@ class DesignModel {
 
   /// Uploaded background picture (overrides the gradient when present).
   final Uint8List? bi;
+
+  /// Where [bi] lives in Storage (bucket `app-assets`), when it came from there.
+  final String? biPath;
+
+  /// The template a saved design was made from (`user_designs.source_template_id`).
+  final int? sourceId;
   final String by;
   final bool pm;
   final int cost;
@@ -48,6 +56,8 @@ class DesignModel {
     String? desc,
     List<Color>? bg,
     Uint8List? bi,
+    String? biPath,
+    int? sourceId,
     bool clearBi = false,
     String? by,
     bool? pm,
@@ -63,6 +73,8 @@ class DesignModel {
       desc: desc ?? this.desc,
       bg: bg ?? this.bg,
       bi: clearBi ? null : (bi ?? this.bi),
+      biPath: clearBi ? null : (biPath ?? this.biPath),
+      sourceId: sourceId ?? this.sourceId,
       by: by ?? this.by,
       pm: pm ?? this.pm,
       cost: cost ?? this.cost,

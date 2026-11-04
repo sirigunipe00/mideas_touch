@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/painting.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../data/catalog.dart';
 import '../models/design_element.dart';
 import '../models/design_model.dart';
 
@@ -29,7 +28,7 @@ class StudioForm {
   final String subtitle;
   final String emoji;
 
-  /// Index into [Catalog.backgrounds]; `-1` when editing a design whose
+  /// Index into the catalogue's background presets; `-1` when editing a design whose
   /// colours are not one of the presets.
   final int gradient;
   final Uint8List? mainImage;
@@ -68,14 +67,16 @@ class StudioForm {
   }
 
   /// Builds the preview / published design (`bt()` in the artifact).
-  DesignModel toDesign(int id) {
+  DesignModel toDesign(int id, List<List<Color>> presets) {
     const white = Color(0xFFFFFFFF);
     return DesignModel(
       id: id,
       name: name.isEmpty ? 'Untitled' : name,
       cat: cat,
       desc: desc,
-      bg: gradient >= 0 ? Catalog.backgrounds[gradient] : customBg!,
+      bg: gradient >= 0 && gradient < presets.length
+          ? presets[gradient]
+          : (customBg ?? const [Color(0xFF8A6A00), Color(0xFFEFBF05)]),
       bi: bgImage,
       by: 'You',
       pm: premium,
@@ -112,10 +113,10 @@ class StudioForm {
   }
 
   /// Fills the form from an existing design (`eu(id)`).
-  factory StudioForm.fromDesign(DesignModel d) {
+  factory StudioForm.fromDesign(DesignModel d, List<List<Color>> presets) {
     final texts = d.els.where((e) => e.isText).toList();
     final image = d.els.firstWhere((e) => e.isImage);
-    final g = Catalog.backgrounds.indexWhere((b) => b.first == d.bg.first);
+    final g = presets.indexWhere((b) => b.first == d.bg.first);
     return StudioForm(
       name: d.name,
       cat: d.cat,
@@ -174,9 +175,9 @@ class StudioCubit extends Cubit<StudioState> {
       emit(state.copyWith(form: change(state.form)));
 
   /// `eu(id)`: edit an existing design.
-  void edit(DesignModel d) => emit(StudioState(
+  void edit(DesignModel d, List<List<Color>> presets) => emit(StudioState(
         tab: 'Upload',
-        form: StudioForm.fromDesign(d),
+        form: StudioForm.fromDesign(d, presets),
         editingId: d.id,
         formVersion: state.formVersion + 1,
       ));

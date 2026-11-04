@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/account.dart';
+import '../models/catalog_models.dart';
 import '../models/design_model.dart';
 
 class SessionState {
@@ -7,6 +9,7 @@ class SessionState {
     this.user,
     this.fullName = '',
     this.registering = true,
+    this.busy = false,
     this.coins = 0,
     this.unlocked = const [],
     this.done = const {},
@@ -25,10 +28,13 @@ class SessionState {
 
   /// Register (true) or Login (false) tab of the auth sheet.
   final bool registering;
+
+  /// A register / login request is in flight.
+  final bool busy;
   final int coins;
   final List<int> unlocked;
 
-  /// Completed "earn coins" tasks: `f`ollow, `r`efer, `t`ag.
+  /// Completed "earn coins" tasks, by `earn_tasks.key`.
   final Map<String, bool> done;
   final List<CoinTx> history;
   final bool inviteSent;
@@ -50,6 +56,7 @@ class SessionState {
     Object? user = _keep,
     String? fullName,
     bool? registering,
+    bool? busy,
     int? coins,
     List<int>? unlocked,
     Map<String, bool>? done,
@@ -63,6 +70,7 @@ class SessionState {
       user: identical(user, _keep) ? this.user : user as Account?,
       fullName: fullName ?? this.fullName,
       registering: registering ?? this.registering,
+      busy: busy ?? this.busy,
       coins: coins ?? this.coins,
       unlocked: unlocked ?? this.unlocked,
       done: done ?? this.done,
@@ -77,15 +85,10 @@ class SessionState {
 
 const Object _keep = Object();
 
-/// The local account: sign-in state, coins, unlocked designs and saved
-/// designs. Everything lives in memory (dummy data, no backend).
+/// The signed-in account as the app shows it. The truth lives in Supabase
+/// (see `UserRepository`); this cubit only mirrors what the server returned.
 class SessionCubit extends Cubit<SessionState> {
-  SessionCubit({required List<DesignModel> seedDesigns})
-      : _seed = seedDesigns,
-        super(const SessionState());
-
-  final List<DesignModel> _seed;
-  bool _seeded = false;
+  SessionCubit() : super(const SessionState());
 
   void setRegistering(bool value) => emit(state.copyWith(registering: value));
 
@@ -93,20 +96,35 @@ class SessionCubit extends Cubit<SessionState> {
 
   void setFilter(String value) => emit(state.copyWith(myDesignsFilter: value));
 
-  /// Create the account / log in. Matches `signIn()` of the artifact: the
-  /// credentials are not validated, the name defaults to "Aarav".
-  void signIn({AccountRole role = AccountRole.customer}) {
-    final name = state.fullName.isEmpty ? 'Aarav' : state.fullName;
-    var designs = state.designs;
-    if (!_seeded) {
-      designs = _seed;
-      _seeded = true;
-    }
+  void setBusy(bool value) => emit(state.copyWith(busy: value));
+
+  /// Mirrors the server data after sign-in or after any wallet change.
+  void applySnapshot(UserSnapshot s) {
+    final current = state.user;
     emit(state.copyWith(
-        user: Account(name: name, role: role), designs: designs));
+      // A creator-mode override (hidden developer toggle) survives refreshes.
+      user: Account(
+          name: s.name, email: s.email, role: current?.role ?? s.role),
+      coins: s.coins,
+      premium: s.premium,
+      unlocked: s.unlocked,
+      history: s.history,
+      done: {for (final k in s.doneTasks) k: true},
+      designs: s.designs,
+    ));
+  }
+
+  /// Hands a downloaded Storage picture to every saved design that uses it.
+  void attachDesignImage(String path, Uint8List bytes) {
+    if (!state.designs.any((d) => d.biPath == path && d.bi == null)) return;
+    emit(state.copyWith(designs: [
+      for (final d in state.designs)
+        d.biPath == path && d.bi == null ? d.copyWith(bi: bytes) : d
+    ]));
   }
 
   /// Developer affordance: switch between customer and creator accounts.
+  /// (Creator features are on hold; this only changes what the UI shows.)
   void toggleCreator() {
     final u = state.user;
     if (u == null) return;
@@ -116,50 +134,13 @@ class SessionCubit extends Cubit<SessionState> {
   }
 
   void logout() {
-    _seeded = false;
     emit(SessionState(
       registering: state.registering,
       fullName: state.fullName,
-      premium: state.premium,
     ));
-  }
-
-  void addCoins(int n, String label) {
-    emit(state.copyWith(
-        coins: state.coins + n, history: [CoinTx(label, n), ...state.history]));
-  }
-
-  /// Returns false when the task was already completed.
-  bool earn(String key, String label) {
-    if (state.done[key] == true) return false;
-    emit(state.copyWith(done: {...state.done, key: true}));
-    addCoins(1, label);
-    return true;
   }
 
   void markInviteSent() => emit(state.copyWith(inviteSent: true));
-
-  void unlock(DesignModel d) {
-    emit(state.copyWith(
-      coins: state.coins - 1,
-      unlocked: [...state.unlocked, d.id],
-      history: [CoinTx('Unlocked ${d.name}', -1), ...state.history],
-    ));
-  }
-
-  /// Returns an error message, or `null` when the coins were sent.
-  String? sendCoins(String recipient, String amount) {
-    final r = recipient.trim();
-    final n = (double.tryParse(amount.trim()) ?? 0).floor();
-    if (r.isEmpty) return 'Enter who to send to';
-    if (!(n >= 1)) return 'Enter number of coins';
-    if (n > state.coins) return 'Not enough coins';
-    emit(state.copyWith(
-      coins: state.coins - n,
-      history: [CoinTx('Sent to $r', -n), ...state.history],
-    ));
-    return null;
-  }
 
   void saveDesign(DesignModel d) {
     final list = [...state.designs];

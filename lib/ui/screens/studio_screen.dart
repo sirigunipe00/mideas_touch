@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
 import '../../models/design_model.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/settings_cubit.dart';
@@ -182,6 +181,7 @@ class _UploadForm extends StatelessWidget {
     final st = context.watch<StudioCubit>().state;
     final studio = context.read<StudioCubit>();
     final u = st.form;
+    final cat = context.watch<CatalogCubit>().state;
     final editing = st.editingId != 0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -192,7 +192,7 @@ class _UploadForm extends StatelessWidget {
             decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14), boxShadow: pal.sh),
             clipBehavior: Clip.antiAlias,
-            child: DesignCanvas(design: u.toDesign(st.editingId)),
+            child: DesignCanvas(design: u.toDesign(st.editingId, cat.backgrounds)),
           ),
         ),
         const SizedBox(height: 4),
@@ -202,7 +202,7 @@ class _UploadForm extends StatelessWidget {
             value: u.name, onChanged: (v) => studio.update((f) => f.copyWith(name: v))),
         const FieldLabel('Category'),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final c in Catalog.categories)
+          for (final c in cat.categories)
             CategoryChip(c,
                 on: u.cat == c,
                 onTap: () => studio.update((f) => f.copyWith(cat: c))),
@@ -225,7 +225,7 @@ class _UploadForm extends StatelessWidget {
             onChanged: (v) => studio.update((f) => f.copyWith(subtitle: v))),
         const FieldLabel('Main image'),
         ArtifactGrid(columns: 6, padding: EdgeInsets.zero, children: [
-          for (final a in Catalog.assets.take(6))
+          for (final a in cat.assets.take(6))
             AssetCell(a.emoji,
                 fontSize: 22,
                 on: u.emoji == a.emoji,
@@ -253,14 +253,14 @@ class _UploadForm extends StatelessWidget {
           ),
         const FieldLabel('Background'),
         ArtifactGrid(columns: 6, padding: EdgeInsets.zero, children: [
-          for (var i = 0; i < Catalog.backgrounds.length; i++)
+          for (var i = 0; i < cat.backgrounds.length; i++)
             Tap(
               onTap: () => studio.update(
                   (f) => f.copyWith(gradient: i, clearBgImage: true)),
               child: Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  gradient: CssLinearGradient(145, Catalog.backgrounds[i]),
+                  gradient: CssLinearGradient(145, cat.backgrounds[i]),
                   borderRadius: BorderRadius.circular(14),
                   border: u.gradient == i && u.bgImage == null
                       ? Border.all(color: pal.p, width: 2)

@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
-import '../../data/catalog.dart';
 import '../../models/account.dart';
+import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../../state/session_cubit.dart';
 import '../widgets/coin.dart';
@@ -18,6 +18,7 @@ class WalletScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final pal = context.pal;
     final s = context.watch<SessionCubit>().state;
+    final cat = context.watch<CatalogCubit>().state;
     final app = context.app;
     return Column(children: [
       const BackHeader('My Coins'),
@@ -25,43 +26,41 @@ class WalletScreen extends StatelessWidget {
         child: ListView(padding: EdgeInsets.zero, children: [
           _BalanceCard(coins: s.coins),
           const SectionTitle('Earn coins'),
-          _TaskRow(
-              icon: '📣',
-              label: 'Follow us',
-              subtitle: 'On our social media pages',
-              done: s.done['f'] == true,
-              onTap: () => app.earn('f', 'Followed us')),
-          if (s.inviteSent && s.done['r'] != true)
-            MenuRow(
-              trailing: AppButton('Simulate accepted',
-                  small: true,
-                  style: BtnStyle.ghost,
-                  onTap: () => app.earn('r', 'Friend accepted your invite')),
-              child: const _TaskText('🤝', 'Refer a friend',
-                  'Invite sent. You get 1 coin when they accept.'),
-            )
-          else
-            _TaskRow(
-                icon: '🤝',
-                label: 'Refer a friend',
-                subtitle: '1 coin when your friend accepts',
-                done: s.done['r'] == true,
-                button: 'Invite',
-                onTap: () => context
-                    .read<NavCubit>()
-                    .openSheet(const InviteSheet())),
-          _TaskRow(
-              icon: '🏷️',
-              label: 'Tag us',
-              subtitle: 'Tag Midas’s Touch in your post',
-              done: s.done['t'] == true,
-              onTap: () => app.earn('t', 'Tagged us')),
+          for (final task in cat.data.earnTasks)
+            if (task.key == 'refer')
+              if (s.inviteSent && s.done[task.key] != true)
+                MenuRow(
+                  trailing: AppButton('Simulate accepted',
+                      small: true,
+                      style: BtnStyle.ghost,
+                      onTap: () => app.earn(task.key)),
+                  child: _TaskText(task.icon, task.title,
+                      'Invite sent. You get 1 coin when they accept.'),
+                )
+              else
+                _TaskRow(
+                    icon: task.icon,
+                    label: task.title,
+                    subtitle: task.description,
+                    done: s.done[task.key] == true,
+                    button: task.buttonLabel,
+                    onTap: () => context
+                        .read<NavCubit>()
+                        .openSheet(const InviteSheet()))
+            else
+              _TaskRow(
+                  icon: task.icon,
+                  label: task.title,
+                  subtitle: task.description,
+                  done: s.done[task.key] == true,
+                  button: task.buttonLabel,
+                  onTap: () => app.earn(task.key)),
           const SectionTitle('Buy coins'),
-          for (var i = 0; i < Catalog.coinPacks.length; i++)
+          for (final pack in cat.data.coinPacks)
             _PlanCard(
-                pack: Catalog.coinPacks[i],
-                popular: i == 1,
-                onBuy: () => app.buy(Catalog.coinPacks[i])),
+                pack: pack,
+                popular: pack.popular,
+                onBuy: () => app.buy(pack)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4.2),
             child: Text(

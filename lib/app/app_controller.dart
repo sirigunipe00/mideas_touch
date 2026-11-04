@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
+import '../data/repositories.dart';
 import '../models/account.dart';
 import '../models/design_element.dart';
 import '../models/design_model.dart';
@@ -32,6 +34,8 @@ class AppController {
     required this.editor,
     required this.studio,
     required this.settings,
+    required this.auth,
+    required this.users,
     ExportService? exporter,
   }) : exporter = exporter ?? ExportService();
 
@@ -41,12 +45,15 @@ class AppController {
   final EditorCubit editor;
   final StudioCubit studio;
   final SettingsCubit settings;
+  final AuthRepository auth;
+  final UserRepository users;
   final ExportService exporter;
 
   final ValueNotifier<ToastEvent?> toasts = ValueNotifier(null);
   int _toastId = 0;
   VoidCallback? _pending;
   int _exportToken = 0;
+  bool _busy = false;
 
   static const inviteMessage = 'Hey, have send you a beautiful Creation App';
 
@@ -62,6 +69,50 @@ class AppController {
 
   void toast(String message) {
     toasts.value = ToastEvent(message, ++_toastId);
+  }
+
+  // ---- start-up --------------------------------------------------------
+
+  /// Loads the catalogue and restores the previous login, if any.
+  Future<void> start() async {
+    final catalogLoaded = catalog.load();
+    if (auth.hasSession) await _loadUser();
+    await catalogLoaded;
+  }
+
+  /// Pulls the signed-in user's data (profile, wallet, designs) from the
+  /// server. Returns false (after a toast) when that fails.
+  Future<bool> _loadUser() async {
+    try {
+      session.applySnapshot(await users.load());
+    } on AppException catch (e) {
+      toast(e.message);
+      return false;
+    }
+    unawaited(_loadDesignPictures());
+    return true;
+  }
+
+  /// The wallet changed on the server: mirror it (coins, history, tasks…).
+  Future<void> _refreshUser() async {
+    try {
+      session.applySnapshot(await users.load());
+    } on AppException catch (e) {
+      toast(e.message);
+    }
+  }
+
+  Future<void> _loadDesignPictures() async {
+    final paths = {
+      for (final d in session.state.designs)
+        if (d.biPath != null && d.bi == null) d.biPath!
+    };
+    for (final path in paths) {
+      final bytes = await catalog.image(path);
+      if (bytes != null && !session.isClosed) {
+        session.attachDesignImage(path, bytes);
+      }
+    }
   }
 
   // ---- navigation helpers ----------------------------------------------
@@ -83,7 +134,8 @@ class AppController {
   void runBannerAction(BannerAction action) {
     switch (action) {
       case BannerAction.startCreating:
-        use(1);
+        final first = catalog.state.templates.firstOrNull;
+        if (first != null) use(first.id);
       case BannerAction.earnCoins:
       case BannerAction.seePacks:
         openWallet();
@@ -105,17 +157,63 @@ class AppController {
     }
   }
 
-  void signIn() {
-    session.signIn();
+  static final _emailPattern =
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  /// "Create Account" / "Login" in the auth sheet. Validates, calls Supabase
+  /// Auth and, on success, loads the user's data and runs the action that
+  /// asked for the login.
+  Future<void> submitAuth(
+      {required String email, required String password}) async {
+    if (session.state.busy) return;
+    final registering = session.state.registering;
+    final mail = email.trim();
+    if (!_emailPattern.hasMatch(mail)) {
+      toast('Enter a valid email address');
+      return;
+    }
+    if (registering ? password.length < 8 : password.isEmpty) {
+      toast(registering
+          ? 'Password must be at least 8 characters'
+          : 'Enter your password');
+      return;
+    }
+    final typed = session.state.fullName.trim();
+    final name = typed.isNotEmpty ? typed : mail.split('@').first;
+    if (registering && name.length > 60) {
+      toast('Name must be 60 characters or fewer');
+      return;
+    }
+
+    session.setBusy(true);
+    try {
+      if (registering) {
+        await auth.signUp(name: name, email: mail, password: password);
+      } else {
+        await auth.signIn(email: mail, password: password);
+      }
+      if (!await _loadUser()) {
+        // Signed in, but the profile could not be read (e.g. offline).
+        return;
+      }
+    } on AppException catch (e) {
+      toast(e.message);
+      return;
+    } finally {
+      session.setBusy(false);
+    }
     studio.resetOnLogin();
     nav.closeSheet();
     final pending = _pending;
     _pending = null;
-    toast(session.state.isCreator ? 'Welcome, creator' : 'Registered successfully');
+    toast(session.state.isCreator
+        ? 'Welcome, creator'
+        : (registering ? 'Registered successfully' : 'Logged in successfully'));
     pending?.call();
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await auth.signOut();
     session.logout();
     studio.resetOnLogin();
     tab(AppView.home);
@@ -134,24 +232,61 @@ class AppController {
 
   // ---- coins -----------------------------------------------------------
 
-  void earn(String key, String label) {
-    if (session.earn(key, label)) toast('+1 coin earned');
+  /// Completes an "Earn coins" task on the server and refreshes the wallet.
+  Future<void> earn(String key) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      final granted = await users.claimTask(key);
+      await _refreshUser();
+      if (granted) toast('+1 coin earned');
+    } on AppException catch (e) {
+      toast(e.message);
+    } finally {
+      _busy = false;
+    }
   }
 
-  void buy(CoinPack pack) {
-    session.addCoins(pack.total, 'Bought ₹${pack.price} pack');
-    toast('Payment successful (demo)');
+  Future<void> buy(CoinPack pack) async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await users.buyPack(pack.id);
+      await _refreshUser();
+      toast('Payment successful (demo)');
+    } on AppException catch (e) {
+      toast(e.message);
+    } finally {
+      _busy = false;
+    }
   }
 
-  void sendCoins(String recipient, String amount) {
+  Future<void> sendCoins(String recipient, String amount) async {
+    if (_busy) return;
+    final r = recipient.trim();
     final n = (double.tryParse(amount.trim()) ?? 0).floor();
-    final error = session.sendCoins(recipient, amount);
+    final error = r.isEmpty
+        ? 'Enter who to send to'
+        : !(n >= 1)
+            ? 'Enter number of coins'
+            : n > session.state.coins
+                ? 'Not enough coins'
+                : null;
     if (error != null) {
       toast(error);
       return;
     }
-    nav.closeSheet();
-    toast('$n coin(s) sent');
+    _busy = true;
+    try {
+      await users.sendCoins(r, n);
+      await _refreshUser();
+      nav.closeSheet();
+      toast('$n coin(s) sent');
+    } on AppException catch (e) {
+      toast(e.message);
+    } finally {
+      _busy = false;
+    }
   }
 
   Future<void> inviteCopy() async {
@@ -179,9 +314,20 @@ class AppController {
 
   void use(int id) => need(() => _use2(id));
 
-  void _use2(int id) {
-    final d = catalog.state.byId(id);
-    if (d == null) return;
+  /// [d] with its Storage picture in memory (waits for the download when the
+  /// picture has not arrived yet), so the editor and exports never start from
+  /// the placeholder gradient.
+  Future<DesignModel> _withPicture(DesignModel d) async {
+    final path = d.biPath;
+    if (path == null || d.bi != null) return d;
+    final bytes = await catalog.image(path);
+    return bytes == null ? d : d.copyWith(bi: bytes);
+  }
+
+  Future<void> _use2(int id) async {
+    final template = catalog.state.byId(id);
+    if (template == null) return;
+    final d = await _withPicture(template);
     if (session.state.isLocked(d)) {
       if (session.state.coins < 1) {
         nav.openSheet(const NoCoinsSheet());
@@ -193,6 +339,7 @@ class AppController {
     editor.open(
       d.copyWith(
           id: DateTime.now().millisecondsSinceEpoch,
+          sourceId: d.id,
           status: 'Draft',
           mod: 'Just now'),
       tool: EditorTool.text,
@@ -200,19 +347,34 @@ class AppController {
     nav.go(AppView.editor);
   }
 
-  void unlock() {
+  /// "Unlock & Customise": spends 1 coin on the server.
+  Future<void> unlock() async {
     final sheet = nav.state.sheet;
-    if (sheet is! UnlockSheet) return;
+    if (sheet is! UnlockSheet || _busy) return;
     final d = catalog.state.byId(sheet.designId);
     if (d == null) return;
-    session.unlock(d);
+    _busy = true;
+    try {
+      final ok = await users.unlockTemplate(d.id);
+      await _refreshUser();
+      if (!ok) {
+        nav.openSheet(const NoCoinsSheet());
+        return;
+      }
+    } on AppException catch (e) {
+      toast(e.message);
+      return;
+    } finally {
+      _busy = false;
+    }
     nav.closeSheet();
-    _use2(d.id);
+    await _use2(d.id);
   }
 
-  void editSaved(int id) {
-    final d = session.state.designs.where((x) => x.id == id).firstOrNull;
-    if (d == null) return;
+  Future<void> editSaved(int id) async {
+    final saved = session.state.designs.where((x) => x.id == id).firstOrNull;
+    if (saved == null) return;
+    final d = await _withPicture(saved);
     editor.open(d);
     nav.go(AppView.editor);
   }
@@ -222,24 +384,36 @@ class AppController {
     nav.openSheet(const ActionsSheet());
   }
 
-  void deleteSaved(int id) {
+  Future<void> deleteSaved(int id) async {
+    try {
+      await users.deleteDesign(id);
+    } on AppException catch (e) {
+      toast(e.message);
+      return;
+    }
     session.deleteDesign(id);
     nav.closeSheet();
     toast('Design deleted');
   }
 
-  void swapTemplate(DesignModel d) {
-    if (session.state.isLocked(d)) {
+  Future<void> swapTemplate(DesignModel template) async {
+    if (session.state.isLocked(template)) {
       toast('Unlock this design first (1 coin)');
       return;
     }
-    editor.swapTemplate(d);
+    editor.swapTemplate(await _withPicture(template));
   }
 
-  void save() {
+  Future<void> save() async {
     final cur = editor.state.design;
     if (cur == null) return;
     final saved = cur.copyWith(mod: 'Just now');
+    try {
+      await users.saveDesign(saved);
+    } on AppException {
+      nav.openSheet(const ErrorSheet('Save error'));
+      return;
+    }
     session.saveDesign(saved);
     editor.markSaved(saved, 'Saved just now');
     toast('Design saved successfully');
@@ -266,13 +440,17 @@ class AppController {
     final id = editing
         ? studio.state.editingId
         : DateTime.now().millisecondsSinceEpoch;
-    catalog.publish(form.toDesign(id).copyWith(status: 'Published'),
+    catalog.publish(
+        form
+            .toDesign(id, catalog.state.data.backgrounds)
+            .copyWith(status: 'Published'),
         replace: editing);
     toast(editing ? 'Design updated' : 'Design published');
     studio.finish();
   }
 
-  void editTemplate(DesignModel d) => studio.edit(d);
+  void editTemplate(DesignModel d) =>
+      studio.edit(d, catalog.state.data.backgrounds);
 
   void deleteTemplate(int id) {
     catalog.delete(id);
@@ -344,9 +522,10 @@ class AppController {
 
   /// Download straight from a template's detail page (`dlT`).
   void downloadTemplate(int id) => need(() async {
-        final d = catalog.state.byId(id);
-        if (d == null) return;
+        final template = catalog.state.byId(id);
+        if (template == null) return;
         try {
+          final d = await _withPicture(template);
           final bytes = await exporter.renderJpeg(d,
               quality: .92, watermark: _watermark);
           final name = d.name.toLowerCase().replaceAll(' ', '_');

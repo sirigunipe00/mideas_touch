@@ -1,0 +1,1 @@
+void installSupabaseDns(String supabaseUrl) {}

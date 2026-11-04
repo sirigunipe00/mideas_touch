@@ -173,4 +173,67 @@ class DesignElement {
       image: clearImage ? null : (image ?? this.image),
     );
   }
+
+  // ---- persistence (user_designs.elements) --------------------------------
+  // Uploaded picture bytes are not part of the JSON.
+
+  /// `#rrggbb`, or `#aarrggbb` when the colour is translucent.
+  static String _hex(Color c) => c.alpha == 255
+      ? '#${(c.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}'
+      : '#${c.value.toRadixString(16).padLeft(8, '0')}';
+
+  static Color _color(Object? v, Color fallback) {
+    if (v is! String) return fallback;
+    final h = v.replaceAll('#', '');
+    final n = int.tryParse(h.length == 6 ? 'FF$h' : h, radix: 16);
+    return n == null ? fallback : Color(n);
+  }
+
+  static double _num(Object? v, double fallback) =>
+      v is num ? v.toDouble() : fallback;
+
+  Map<String, Object?> toJson() => {
+        'kind': kind.name,
+        'x': x,
+        'y': y,
+        'w': w,
+        'h': h,
+        'r': r,
+        'text': text,
+        'font': font,
+        'size': size,
+        'color': _hex(color),
+        'bold': bold,
+        'italic': italic,
+        'underline': underline,
+        'align': align.name,
+        'fill': _hex(fill),
+        'shape': shape.name,
+        'emoji': emoji,
+        'photo': photo,
+      };
+
+  factory DesignElement.fromJson(Map<String, dynamic> j) {
+    final kind = ElementKind.values.asNameMap()[j['kind']] ?? ElementKind.text;
+    return DesignElement(
+      kind: kind,
+      x: _num(j['x'], 0),
+      y: _num(j['y'], 0),
+      w: _num(j['w'], 30),
+      h: _num(j['h'], 0),
+      r: _num(j['r'], 0),
+      text: (j['text'] as String?) ?? '',
+      font: (j['font'] as String?) ?? 'Poppins',
+      size: _num(j['size'], 20),
+      color: _color(j['color'], const Color(0xFFFFFFFF)),
+      bold: j['bold'] == true,
+      italic: j['italic'] == true,
+      underline: j['underline'] == true,
+      align: TextAlign.values.asNameMap()[j['align']] ?? TextAlign.center,
+      fill: _color(j['fill'], const Color(0xFFFDE68A)),
+      shape: ShapeStyle.values.asNameMap()[j['shape']] ?? ShapeStyle.rect,
+      emoji: (j['emoji'] as String?) ?? '',
+      photo: j['photo'] == true,
+    );
+  }
 }

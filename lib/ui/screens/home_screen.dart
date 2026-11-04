@@ -4,8 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
-import '../../core/l10n/strings.dart';
-import '../../data/catalog.dart';
+import '../../models/catalog_models.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../../state/session_cubit.dart';
@@ -49,11 +48,19 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const _CoinsChip(),
-              _BannerPager(strings: t),
+              _BannerPager(lang: settings.lang),
               SectionTitle(t('cat'), top: 6),
               const _CategoryChips(),
               BlocBuilder<CatalogCubit, CatalogState>(
                 builder: (context, cat) {
+                  if (cat.status == CatalogStatus.error) {
+                    return EmptyState(
+                      title: 'Couldn’t load designs',
+                      message: cat.error,
+                      buttonLabel: 'Try again',
+                      onButton: context.read<CatalogCubit>().load,
+                    );
+                  }
                   final all = cat.templates;
                   return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,18 +130,21 @@ class _CategoryChips extends StatelessWidget {
   const _CategoryChips();
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-        child: Row(children: [
-          for (var i = 0; i < Catalog.categories.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            CategoryChip(Catalog.categories[i],
-                onTap: () =>
-                    context.app.chooseCategory(Catalog.categories[i])),
-          ]
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final categories =
+        context.select<CatalogCubit, List<String>>((c) => c.state.categories);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+      child: Row(children: [
+        for (var i = 0; i < categories.length; i++) ...[
+          if (i > 0) const SizedBox(width: 8),
+          CategoryChip(categories[i],
+              onTap: () => context.app.chooseCategory(categories[i])),
+        ]
+      ]),
+    );
+  }
 }
 
 class _Slide {
@@ -150,27 +160,30 @@ class _Slide {
   final bool dark;
 }
 
-List<_Slide> _slides(Strings t) => [
-      _Slide([hex('#efbf05'), hex('#f6da6f')], t('tag'), t('h1'), t('sub'),
-          t('start'), BannerAction.startCreating),
-      _Slide([hex('#f6da6f'), hex('#faeaac')], '🪙 Earn free coins',
-          'Follow, refer and tag to earn coins', '1 coin for each action.',
-          'Earn coins', BannerAction.earnCoins),
-      _Slide([hex('#1d1700'), hex('#4a3c0c')], 'Buy coins',
-          'Get up to 15 coins for ₹100',
-          '₹10 for 1 coin. Bigger packs give bonus coins.', 'See packs',
-          BannerAction.seePacks,
-          dark: true),
-      _Slide([hex('#e8a20a'), hex('#efbf05')], 'Festival season',
-          'Festive designs are here', 'Explore for free. Customise with 1 coin.',
-          'Explore', BannerAction.explore),
-    ];
+/// The `banners` rows as slides, in the selected language (Hindi texts fall
+/// back to English when a banner has none).
+List<_Slide> _slides(List<HomeBanner> banners, String lang) {
+  final hi = lang == 'hi';
+  String pick(String en, String? alt) => hi && alt != null ? alt : en;
+  return [
+    for (final b in banners)
+      _Slide(
+        b.colors,
+        pick(b.tag, b.tagHi),
+        pick(b.title, b.titleHi),
+        pick(b.body, b.bodyHi),
+        pick(b.button, b.buttonHi),
+        BannerAction.values.asNameMap()[b.action] ?? BannerAction.explore,
+        dark: b.dark,
+      )
+  ];
+}
 
 /// `BANNERS()`: swipeable hero banners with dots and 3.5s auto-advance.
 class _BannerPager extends StatefulWidget {
-  const _BannerPager({required this.strings});
+  const _BannerPager({required this.lang});
 
-  final Strings strings;
+  final String lang;
 
   @override
   State<_BannerPager> createState() => _BannerPagerState();
@@ -188,7 +201,9 @@ class _BannerPagerState extends State<_BannerPager> {
       if (!mounted || !_controller.hasClients) return;
       final nav = context.read<NavCubit>().state;
       if (nav.view != AppView.home || nav.sheet != null || nav.intro) return;
-      _controller.animateToPage((_index + 1) % 4,
+      final count = context.read<CatalogCubit>().state.data.banners.length;
+      if (count < 2) return;
+      _controller.animateToPage((_index + 1) % count,
           duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
     });
   }
@@ -203,7 +218,16 @@ class _BannerPagerState extends State<_BannerPager> {
   @override
   Widget build(BuildContext context) {
     final pal = context.pal;
-    final slides = _slides(widget.strings);
+    final banners =
+        context.select<CatalogCubit, List<HomeBanner>>((c) => c.state.data.banners);
+    final slides = _slides(banners, widget.lang);
+    if (slides.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+        child: Skeleton(height: 180, radius: 24),
+      );
+    }
+    if (_index >= slides.length) _index = 0;
     return Column(children: [
       const SizedBox(height: 12),
       Stack(fit: StackFit.passthrough, children: [
