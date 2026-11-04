@@ -2,7 +2,7 @@
 -- Midas's Touch — STEP 2: catalogue data.
 --
 -- Run after 01_schema.sql. The 28 template pictures must also be uploaded to
--- the `app-assets` bucket under templates/ (see tool/seed_storage.py).
+-- the `app-assets` bucket under templates/.
 --
 -- Every value below came from the former in-app dummy catalogue (categories,
 -- fonts, gradients, stock images, coin packs, tasks, banners) except the

@@ -400,7 +400,7 @@ grant execute on function public.unlock_template(bigint), public.claim_task(text
 -- ---------------------------------------------------------------------
 -- 6. Storage
 --   app-assets : PUBLIC read. Template pictures live here (templates/...).
---                Written only with the service-role key (tool/seed_storage.py)
+--                Written from the Supabase dashboard (or a service-role key).
 --                or from the dashboard; the app never uploads.
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values

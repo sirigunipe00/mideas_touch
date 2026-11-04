@@ -4,8 +4,8 @@ Last updated: 2026-11-03. Read this first when resuming work.
 
 ## 1. What the app is
 A promotional-design studio. Users browse templates, pay 1 coin to unlock/customise one,
-edit it on a canvas, then export a JPG or share it. A 1:1 Flutter port of the HTML artifact
-(`docs/artifact-reference.html`). **UI, colours, fonts, text and flow must not change.**
+edit it on a canvas, then export a JPG or share it. **UI, colours, fonts, text and flow
+must not change.**
 Creator mode / Studio publishing is **on hold** (still local only; not backed by the DB).
 
 ## 2. Status
@@ -45,17 +45,14 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
 - Tests: `test/fakes.dart` (in-memory backend following the SQL rules),
   `test/state_test.dart`, `test/widget_test.dart`.
 
-## 5. Setup runbook (must be done once, in the Supabase dashboard)
-1. SQL Editor: run `supabase/backend/00_reset_legacy.sql` **only if** the old
-   `supabase/migrations/202611020001_artifact.sql` was ever applied (it DROPS data), then
-   `01_schema.sql`, then `02_seed.sql`.
-2. Upload the images to `app-assets/templates/` (same file names as
-   `supabase/seed/images/`): either drag them into the bucket in the dashboard, or
-   `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… python3 tool/seed_storage.py`
-   (`--verify` only checks the public URLs). Never put the service-role key in the app/git.
-3. Authentication → Providers → Email: turn **Confirm email OFF**; set minimum password
-   length to **8**.
-4. `config/supabase.json` (gitignored) holds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`;
+## 5. Setup runbook (already applied to the live project)
+1. SQL Editor: `supabase/backend/01_schema.sql`, then `02_seed.sql`.
+   `00_reset_legacy.sql` drops tables; run it only to wipe and start over.
+2. Template pictures are in the `app-assets` bucket under `templates/`. The app
+   downloads them; they are not stored in the project.
+3. Authentication → Sign In / Providers → Email: **Confirm email** off, minimum
+   password length **8**.
+4. `config/supabase.json` (gitignored) holds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
    `.vscode/launch.json` passes it. CLI:
    `flutter run --dart-define-from-file=config/supabase.json`.
 
@@ -70,10 +67,8 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
 5. All 28 pictures decoded at 1024² use roughly 117 MB of memory.
 6. Android `INTERNET` permission is in the main manifest. macOS builds would additionally need
    the `com.apple.security.network.client` entitlement.
-7. Legacy leftovers kept (ask before deleting): `supabase/migrations/…`,
-   `supabase_schema.sql`, `supabase/seed*`, `docs/IMPLEMENTATION.md`,
-   `docs/database-inspection.sql`, `docs/supabase/PROPOSED_schema.sql` (superseded by
-   `supabase/backend/`), `tool/prepare_seed.py`.
+7. The old local catalogue, the first SQL draft, and the duplicate template
+   pictures were removed. `supabase/backend/` is the schema that matches the database.
 
 ## 7. Commands
 ```
