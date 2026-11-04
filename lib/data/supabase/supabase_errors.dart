@@ -69,7 +69,8 @@ AppException friendlyError(Object e) {
     }
     if (code == 'email_not_confirmed' || msg.contains('not confirmed')) {
       return const AppException(
-          'Please confirm your email first, then log in.');
+          'This project still requires email confirmation. In Supabase, open '
+          'Authentication › Sign In / Providers › Email and turn Confirm email off.');
     }
     if (code == 'over_request_rate_limit' ||
         code == 'over_email_send_rate_limit' ||

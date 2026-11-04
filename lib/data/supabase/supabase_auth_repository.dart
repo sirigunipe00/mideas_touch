@@ -26,16 +26,16 @@ class SupabaseAuthRepository implements AuthRepository {
         data: {'full_name': name},
       );
       if (res.session != null) return;
-      // No session means Supabase did not sign the user in:
+      // No session means Supabase did not sign the user in.
       if (res.user != null && (res.user!.identities?.isEmpty ?? false)) {
-        // E-mail confirmation is on and the address is already registered
-        // (Supabase hides that by returning a user without identities).
+        // The address is already registered. Supabase hides that by returning
+        // a user with no identities while "Confirm email" is switched on.
         throw const AppException(
             'An account with this email already exists. Please log in.');
       }
-      throw const AppException(
-          'Registration needs e-mail confirmation, which is still switched on '
-          'in the Supabase dashboard (Authentication › Providers › Email).');
+      // Confirm email is still on, so the new account has no session yet.
+      // Sign in immediately when the project allows it.
+      await signIn(email: email, password: password);
     } on AppException {
       rethrow;
     } catch (e) {

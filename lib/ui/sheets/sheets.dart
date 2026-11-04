@@ -188,6 +188,7 @@ class _RegisterContent extends StatefulWidget {
 class _RegisterContentState extends State<_RegisterContent> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  bool _showPassword = false;
 
   @override
   void dispose() {
@@ -225,8 +226,16 @@ class _RegisterContentState extends State<_RegisterContent> {
       AppField(
           controller: _password,
           hint: 'Password',
-          obscure: true,
-          onSubmitted: (_) => _submit()),
+          obscure: !_showPassword,
+          onSubmitted: (_) => _submit(),
+          suffix: IconButton(
+            onPressed: () => setState(() => _showPassword = !_showPassword),
+            icon: Icon(
+              _showPassword ? Icons.visibility_off : Icons.visibility,
+              size: 20,
+              color: context.pal.mu,
+            ),
+          )),
       const SizedBox(height: 6),
       AppButton(
           s.busy ? 'Please wait…' : (reg ? 'Create Account' : 'Login'),
