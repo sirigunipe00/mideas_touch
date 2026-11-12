@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/palette.dart';
 import '../../state/nav_cubit.dart';
@@ -9,7 +10,7 @@ import '../widgets/coin.dart';
 import '../widgets/common.dart';
 import '../widgets/kit.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   static const _errors = [
@@ -19,6 +20,13 @@ class ProfileScreen extends StatelessWidget {
     'Save error',
     'Share-link generation error',
   ];
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +100,7 @@ class ProfileScreen extends StatelessWidget {
             child: LanguageSwitch(expand: true),
           ),
           const SectionTitle('States gallery'),
-          for (final e in _errors)
+          for (final e in ProfileScreen._errors)
             MenuRow(
               onTap: () => context.read<NavCubit>().openSheet(ErrorSheet(e)),
               trailing: const Text('›'),
@@ -115,8 +123,23 @@ class ProfileScreen extends StatelessWidget {
                 AppButton('Log out',
                     style: BtnStyle.ghost, wide: true, onTap: context.app.logout),
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 18),
+                padding: EdgeInsets.fromLTRB(0, 18, 0, 8),
                 child: Center(child: BrandLogo(height: 48)),
+              ),
+              FutureBuilder<PackageInfo>(
+                future: _packageInfo,
+                builder: (context, snap) {
+                  final info = snap.data;
+                  if (info == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Text(
+                      'Version ${info.version}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: pal.mu),
+                    ),
+                  );
+                },
               ),
             ]),
           ),

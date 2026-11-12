@@ -38,6 +38,7 @@ dependencies:
   image: ^4.2.0
   image_picker: ^1.1.2
   supabase_flutter: ^2.15.4
+  package_info_plus: ^8.0.0
 
 dependency_overrides:
   # app_links >= 6.4 reads `flutter.compileSdkVersion` in its Android build
