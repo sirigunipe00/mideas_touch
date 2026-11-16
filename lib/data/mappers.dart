@@ -85,9 +85,30 @@ DesignElement elementFromRow(Map<String, dynamic> r) {
   }
 }
 
+/// Parses DB times: ISO timestamptz or IST text `2026-11-13 15-08-19`.
+DateTime? parseDbTime(Object? raw) {
+  if (raw == null) return null;
+  final s = '$raw'.trim();
+  if (s.isEmpty) return null;
+  final iso = DateTime.tryParse(s);
+  if (iso != null) return iso.toLocal();
+  // templates / IST text style: 2026-11-13 15-08-19
+  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(\d{2})$')
+      .firstMatch(s);
+  if (m == null) return null;
+  return DateTime(
+    int.parse(m[1]!),
+    int.parse(m[2]!),
+    int.parse(m[3]!),
+    int.parse(m[4]!),
+    int.parse(m[5]!),
+    int.parse(m[6]!),
+  );
+}
+
 /// A `user_designs` row as a saved [DesignModel] ("My Designs").
 DesignModel userDesignFromRow(Map<String, dynamic> r, {DateTime? now}) {
-  final updated = DateTime.tryParse('${r['updated_at']}')?.toLocal();
+  final updated = parseDbTime(r['updated_at']);
   return DesignModel(
     id: _i(r['id']),
     name: r['name'] as String,

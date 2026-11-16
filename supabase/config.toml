@@ -1,0 +1,8 @@
+# Minimal Supabase CLI config for deploying Edge Functions.
+project_id = "ctabyiufqvzxcggmhiix"
+
+[functions.create-razorpay-order]
+verify_jwt = true
+
+[functions.verify-razorpay-payment]
+verify_jwt = true

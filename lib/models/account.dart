@@ -5,19 +5,33 @@ enum AccountRole { customer, creator }
 /// The signed-in user (`profiles` row of the Supabase backend).
 @immutable
 class Account {
-  const Account(
-      {required this.name, this.role = AccountRole.customer, this.email = ''});
+  const Account({
+    required this.name,
+    this.id = '',
+    this.role = AccountRole.customer,
+    this.email = '',
+  });
 
+  /// Supabase `profiles.id` / auth user id (used in invite links).
+  final String id;
   final String name;
   final String email;
   final AccountRole role;
 
   bool get isCreator => role == AccountRole.creator;
 
-  Account copyWith({String? name, AccountRole? role, String? email}) => Account(
-      name: name ?? this.name,
-      role: role ?? this.role,
-      email: email ?? this.email);
+  Account copyWith({
+    String? id,
+    String? name,
+    AccountRole? role,
+    String? email,
+  }) =>
+      Account(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        role: role ?? this.role,
+        email: email ?? this.email,
+      );
 }
 
 /// One line of the coin history (`{l, a}` in the artifact).

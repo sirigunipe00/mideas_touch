@@ -18,10 +18,16 @@ begin;
 -- ---------------------------------------------------------------------
 -- 0. Helpers
 -- ---------------------------------------------------------------------
+-- IST text timestamps (same style as templates Table Editor): 2026-11-13 15-08-19
+create function public.ist_now_text()
+returns text language sql stable as $$
+  select to_char((now() at time zone 'Asia/Kolkata'), 'YYYY-MM-DD HH24-MI-SS');
+$$;
+
 create function public.set_updated_at()
 returns trigger language plpgsql as $$
 begin
-  new.updated_at = now();
+  new.updated_at = public.ist_now_text();
   return new;
 end $$;
 
@@ -35,8 +41,8 @@ create table public.profiles (
   role        text not null default 'customer' check (role in ('customer', 'creator')),
   coins       integer not null default 0 check (coins >= 0),
   is_premium  boolean not null default false,   -- premium = no watermark on exports
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  created_at  text not null default public.ist_now_text(),
+  updated_at  text not null default public.ist_now_text()
 );
 create unique index profiles_email_key on public.profiles (lower(email));
 create trigger profiles_updated before update on public.profiles
@@ -155,8 +161,8 @@ create table public.templates (
   price_inr             integer not null default 0 check (price_inr >= 0),
   status                text not null default 'published' check (status in ('draft', 'published', 'archived')),
   sort_order            integer not null default 0,
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now()
+  created_at            text not null default public.ist_now_text(),
+  updated_at            text not null default public.ist_now_text()
 );
 create index templates_category_idx on public.templates (category_id);
 create index templates_status_idx   on public.templates (status, sort_order);
@@ -209,8 +215,8 @@ create table public.user_designs (
   background_image_path text,                          -- a path in bucket app-assets
   elements              jsonb  not null default '[]'::jsonb check (jsonb_typeof(elements) = 'array'),
   status                text   not null default 'Draft' check (status in ('Draft', 'Completed')),
-  created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now(),   -- drives "Last edited"
+  created_at            text not null default public.ist_now_text(),
+  updated_at            text not null default public.ist_now_text(),   -- drives "Last edited"
   primary key (user_id, id)
 );
 create index user_designs_recent_idx on public.user_designs (user_id, updated_at desc);
@@ -220,25 +226,46 @@ create trigger user_designs_updated before update on public.user_designs
 create table public.unlocked_templates (
   user_id     uuid   not null references public.profiles (id) on delete cascade,
   template_id bigint not null references public.templates (id) on delete cascade,
-  unlocked_at timestamptz not null default now(),
+  unlocked_at text not null default public.ist_now_text(),
   primary key (user_id, template_id)
 );
 
 create table public.coin_transactions (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references public.profiles (id) on delete cascade,
+  user_email  text,   -- copied from profiles on insert (see trigger below)
   amount      integer not null check (amount <> 0),
   label       text not null,
   kind        text not null check (kind in ('earn', 'purchase', 'unlock', 'transfer_in', 'transfer_out')),
   template_id bigint references public.templates (id) on delete set null,
-  created_at  timestamptz not null default now()
+  created_at  text not null default public.ist_now_text()
 );
 create index coin_transactions_user_idx on public.coin_transactions (user_id, created_at desc);
+
+create or replace function public.set_coin_tx_user_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_email is null or btrim(new.user_email) = '' then
+    select email into new.user_email
+    from public.profiles
+    where id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger coin_transactions_user_email
+  before insert on public.coin_transactions
+  for each row execute function public.set_coin_tx_user_email();
 
 create table public.user_tasks (            -- completed "Earn coins" tasks
   user_id      uuid not null references public.profiles (id) on delete cascade,
   task_key     text not null references public.earn_tasks (key) on delete cascade,
-  completed_at timestamptz not null default now(),
+  completed_at text not null default public.ist_now_text(),
   primary key (user_id, task_key)
 );
 

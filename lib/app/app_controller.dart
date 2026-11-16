@@ -9,6 +9,8 @@ import '../models/account.dart';
 import '../models/design_element.dart';
 import '../models/design_model.dart';
 import '../services/export_service.dart';
+import '../services/payment_checkout.dart';
+import '../services/referral_service.dart';
 import '../state/catalog_cubit.dart';
 import '../state/editor_cubit.dart';
 import '../state/nav_cubit.dart';
@@ -37,7 +39,11 @@ class AppController {
     required this.auth,
     required this.users,
     ExportService? exporter,
-  }) : exporter = exporter ?? ExportService();
+    PaymentCheckout? payments,
+    ReferralService? referrals,
+  })  : exporter = exporter ?? ExportService(),
+        payments = payments ?? RazorpayCheckout(),
+        referrals = referrals ?? ReferralService();
 
   final NavCubit nav;
   final SessionCubit session;
@@ -48,6 +54,8 @@ class AppController {
   final AuthRepository auth;
   final UserRepository users;
   final ExportService exporter;
+  final PaymentCheckout payments;
+  final ReferralService referrals;
 
   final ValueNotifier<ToastEvent?> toasts = ValueNotifier(null);
   int _toastId = 0;
@@ -55,13 +63,13 @@ class AppController {
   int _exportToken = 0;
   bool _busy = false;
 
-  static const inviteMessage = 'Hey, have send you a beautiful Creation App';
+  static const inviteMessage =
+      'Hey, try Midas\'s Touch — create beautiful designs. Install with my link:';
 
   String get inviteUrl {
-    final name = (session.state.user?.name ?? 'friend')
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]'), '');
-    return 'https://mideas-touch.app/invite/$name';
+    final id = session.state.user?.id ?? '';
+    if (id.isEmpty) return 'https://mideas-touch.app/invite';
+    return ReferralService.inviteUrlFor(id);
   }
 
   String shareLinkFor(DesignModel d) =>
@@ -75,6 +83,7 @@ class AppController {
 
   /// Loads the catalogue and restores the previous login, if any.
   Future<void> start() async {
+    unawaited(referrals.start());
     final catalogLoaded = catalog.load();
     if (auth.hasSession) await _loadUser();
     await catalogLoaded;
@@ -196,6 +205,9 @@ class AppController {
         // Signed in, but the profile could not be read (e.g. offline).
         return;
       }
+      if (registering) {
+        await _applyPendingReferral();
+      }
     } on AppException catch (e) {
       toast(e.message);
       return;
@@ -210,6 +222,19 @@ class AppController {
         ? 'Welcome, creator'
         : (registering ? 'Registered successfully' : 'Logged in successfully'));
     pending?.call();
+  }
+
+  /// If this install came from an invite link, credit the referrer once.
+  Future<void> _applyPendingReferral() async {
+    final referrerId = await referrals.takePendingReferrerId();
+    if (referrerId == null) return;
+    try {
+      await users.acceptReferral(referrerId);
+    } on AppException catch (e) {
+      // Keep the code so a retry is possible if the network failed mid-signup.
+      await referrals.savePendingReferrerId(referrerId);
+      debugPrint('[referral] accept failed: ${e.message}');
+    }
   }
 
   Future<void> logout() async {
@@ -248,14 +273,45 @@ class AppController {
   }
 
   Future<void> buy(CoinPack pack) async {
+    if (session.state.user == null) {
+      need(() => unawaited(buy(pack)));
+      return;
+    }
     if (_busy) return;
     _busy = true;
     try {
-      await users.buyPack(pack.id);
+      final order = await users.createPaymentOrder(pack.id);
+      final result = await payments.open(
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amountPaise: order.amountPaise,
+        name: "Midas's Touch",
+        description: '${order.packName} · ${pack.total} coins',
+        email: session.state.user?.email,
+      );
+      if (result == null) {
+        toast('Payment cancelled');
+        return;
+      }
+      if (result.orderId.isEmpty ||
+          result.paymentId.isEmpty ||
+          result.signature.isEmpty) {
+        toast('Payment incomplete');
+        return;
+      }
+      await users.verifyPayment(
+        orderId: result.orderId,
+        paymentId: result.paymentId,
+        signature: result.signature,
+      );
       await _refreshUser();
-      toast('Payment successful (demo)');
+      toast('Payment successful');
     } on AppException catch (e) {
       toast(e.message);
+    } catch (e) {
+      toast(e is Exception
+          ? e.toString().replaceFirst('Exception: ', '')
+          : 'Payment failed');
     } finally {
       _busy = false;
     }
@@ -290,20 +346,29 @@ class AppController {
   }
 
   Future<void> inviteCopy() async {
+    if ((session.state.user?.id ?? '').isEmpty) {
+      toast('Sign in to get your invite link');
+      return;
+    }
     try {
       await Clipboard.setData(ClipboardData(text: '$inviteMessage $inviteUrl'));
     } catch (_) {}
     session.markInviteSent();
     nav.closeSheet();
-    toast('Invite message copied');
+    toast('Invite link copied');
   }
 
   Future<void> inviteShare() async {
+    if ((session.state.user?.id ?? '').isEmpty) {
+      toast('Sign in to get your invite link');
+      return;
+    }
     try {
       final result = await Share.share('$inviteMessage $inviteUrl');
       if (result.status == ShareResultStatus.success) {
         session.markInviteSent();
         nav.closeSheet();
+        toast('Invite shared. You get 1 coin when they register.');
         return;
       }
     } catch (_) {}
@@ -570,7 +635,11 @@ class AppController {
     }
   }
 
-  void dispose() => toasts.dispose();
+  void dispose() {
+    referrals.dispose();
+    payments.dispose();
+    toasts.dispose();
+  }
 }
 
 extension AppControllerContext on BuildContext {

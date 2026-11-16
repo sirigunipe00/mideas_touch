@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/account.dart';
 import '../../models/catalog_models.dart';
 import '../../models/design_model.dart';
+import '../../services/payment_checkout.dart';
 import '../mappers.dart';
 import '../repositories.dart';
 import 'supabase_errors.dart';
@@ -52,6 +53,7 @@ class SupabaseUserRepository implements UserRepository {
         List<Map<String, dynamic>> rows(Object? v) =>
             List<Map<String, dynamic>>.from(v as List);
         return UserSnapshot(
+          id: uid,
           name: profile['full_name'] as String,
           email: profile['email'] as String,
           role: profile['role'] == 'creator'
@@ -84,6 +86,14 @@ class SupabaseUserRepository implements UserRepository {
           (await _client.rpc('claim_task', params: {'p_key': key})) == true);
 
   @override
+  Future<bool> acceptReferral(String referrerId) => _guard(
+      'accept referral',
+      () async =>
+          (await _client.rpc('accept_referral',
+              params: {'p_referrer_id': referrerId})) ==
+          true);
+
+  @override
   Future<void> sendCoins(String recipientEmail, int amount) =>
       _guard('send coins', () async {
         await _client.rpc('send_coins',
@@ -91,9 +101,56 @@ class SupabaseUserRepository implements UserRepository {
       });
 
   @override
-  Future<void> buyPack(int packId) => _guard('buy pack $packId', () async {
-        await _client.rpc('buy_coin_pack', params: {'p_pack_id': packId});
+  Future<PaymentOrder> createPaymentOrder(int packId) =>
+      _guard('create payment order $packId', () async {
+        final res = await _client.functions.invoke(
+          'create-razorpay-order',
+          body: {'pack_id': packId},
+        );
+        final data = _functionData(res);
+        return PaymentOrder(
+          orderId: data['orderId'] as String,
+          amountPaise: (data['amount'] as num).toInt(),
+          currency: (data['currency'] as String?) ?? 'INR',
+          keyId: data['keyId'] as String,
+          packName: (data['packName'] as String?) ?? 'Coin pack',
+        );
       });
+
+  @override
+  Future<void> verifyPayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) =>
+      _guard('verify payment $orderId', () async {
+        final res = await _client.functions.invoke(
+          'verify-razorpay-payment',
+          body: {
+            'razorpay_order_id': orderId,
+            'razorpay_payment_id': paymentId,
+            'razorpay_signature': signature,
+          },
+        );
+        _functionData(res);
+      });
+
+  Map<String, dynamic> _functionData(FunctionResponse res) {
+    final data = res.data;
+    if (res.status >= 400) {
+      final message = data is Map && data['error'] is String
+          ? data['error'] as String
+          : 'Payment request failed';
+      throw AppException(message);
+    }
+    if (data is Map && data['error'] is String) {
+      throw AppException(data['error'] as String);
+    }
+    if (data is! Map) {
+      throw const AppException('Unexpected payment response');
+    }
+    return Map<String, dynamic>.from(data);
+  }
 
   @override
   Future<void> saveDesign(DesignModel design) =>

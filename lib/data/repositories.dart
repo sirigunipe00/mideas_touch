@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import '../models/catalog_models.dart';
 import '../models/design_model.dart';
+import '../services/payment_checkout.dart';
 
 /// An error whose [message] is safe to show to the user as a toast.
 class AppException implements Exception {
@@ -51,10 +52,21 @@ abstract class UserRepository {
   /// `true` when the reward was newly granted.
   Future<bool> claimTask(String key);
 
+  /// Attributes this new user to [referrerId] and credits the referrer 1 coin.
+  /// Returns `true` when the reward was newly granted.
+  Future<bool> acceptReferral(String referrerId);
+
   Future<void> sendCoins(String recipientEmail, int amount);
 
-  /// Demo purchase (see `buy_coin_pack` in the SQL).
-  Future<void> buyPack(int packId);
+  /// Creates a Razorpay order for [packId] via Edge Function.
+  Future<PaymentOrder> createPaymentOrder(int packId);
+
+  /// Verifies checkout signature and credits coins (idempotent).
+  Future<void> verifyPayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  });
 
   Future<void> saveDesign(DesignModel design);
 

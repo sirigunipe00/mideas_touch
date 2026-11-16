@@ -39,6 +39,9 @@ dependencies:
   image_picker: ^1.1.2
   supabase_flutter: ^2.15.4
   package_info_plus: ^8.0.0
+  razorpay_flutter: ^1.4.7
+  shared_preferences: ^2.5.3
+  app_links: 6.3.2
 
 dependency_overrides:
   # app_links >= 6.4 reads `flutter.compileSdkVersion` in its Android build

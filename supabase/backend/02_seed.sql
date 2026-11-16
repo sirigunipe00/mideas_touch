@@ -48,7 +48,7 @@ insert into public.coin_packs (name, price_inr, coins, bonus_coins, is_popular, 
 
 insert into public.earn_tasks (key, icon, title, description, button_label, history_label, sort_order) values
   ('follow', '📣', 'Follow us',      'On our social media pages',          '+1 🪙', 'Followed us',                  1),
-  ('refer',  '🤝', 'Refer a friend', '1 coin when your friend accepts',    'Invite', 'Friend accepted your invite', 2),
+  ('refer',  '🤝', 'Refer a friend', '1 coin when a friend installs & registers via your link', 'Invite', 'Friend joined with your invite', 2),
   ('tag',    '🏷️', 'Tag us',         'Tag Midas’s Touch in your post',     '+1 🪙', 'Tagged us',                    3);
 
 insert into public.banners
@@ -79,10 +79,10 @@ insert into public.banners
    'Explore', null, null, null, null,
    'explore', '#e8a20a', '#efbf05', false, 4);
 
--- DEMO PAYMENTS: the app's "Buy" button credits coins without a real payment.
--- Set to false (or delete the row) before launch.
+-- DEMO PAYMENTS: kept false once Razorpay is live (see 03_razorpay.sql).
+-- Set to true only for local demos without Razorpay.
 insert into public.app_settings (key, value) values
-  ('demo_payments_enabled', 'true'::jsonb);
+  ('demo_payments_enabled', 'false'::jsonb);
 
 -- ---------------------------------------------------------------------
 -- Templates: the 28 Diwali pictures.

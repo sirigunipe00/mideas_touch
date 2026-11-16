@@ -17,6 +17,7 @@ const _serverMessages = {
   'Not enough coins',
   'Payments are not enabled',
   'Invalid pack',
+  'Share your invite link. You earn 1 coin when a friend installs and registers.',
 };
 
 bool _looksLikeNetwork(Object e) {

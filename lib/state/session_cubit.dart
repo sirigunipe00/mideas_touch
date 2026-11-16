@@ -104,7 +104,11 @@ class SessionCubit extends Cubit<SessionState> {
     emit(state.copyWith(
       // A creator-mode override (hidden developer toggle) survives refreshes.
       user: Account(
-          name: s.name, email: s.email, role: current?.role ?? s.role),
+        id: s.id.isNotEmpty ? s.id : (current?.id ?? ''),
+        name: s.name,
+        email: s.email,
+        role: current?.role ?? s.role,
+      ),
       coins: s.coins,
       premium: s.premium,
       unlocked: s.unlocked,

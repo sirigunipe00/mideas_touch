@@ -539,7 +539,8 @@ class _InviteContent extends StatelessWidget {
     final pal = context.pal;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SheetTitle('🤝 Invite a friend'),
-      const SheetText('Share this message with your friend:'),
+      const SheetText(
+          'Share your link. When they install and register, you get 1 coin.'),
       Container(
         margin: const EdgeInsets.symmetric(vertical: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

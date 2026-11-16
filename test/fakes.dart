@@ -4,6 +4,8 @@ import 'package:mideas_touch/data/repositories.dart';
 import 'package:mideas_touch/models/account.dart';
 import 'package:mideas_touch/models/catalog_models.dart';
 import 'package:mideas_touch/models/design_model.dart';
+import 'package:mideas_touch/services/payment_checkout.dart';
+import 'package:mideas_touch/services/referral_service.dart';
 
 /// 1x1 white PNG, a stand-in for a template picture.
 final Uint8List kTinyPng = Uint8List.fromList(const [
@@ -26,6 +28,59 @@ DesignModel sampleTemplate(int id, String name,
       biPath: path,
       els: const [],
     );
+
+/// In-memory referral store for tests (no platform plugins).
+class FakeReferralService extends ReferralService {
+  String? pending;
+
+  @override
+  Future<void> start() async {}
+
+  @override
+  Future<void> savePendingReferrerId(String id) async {
+    pending = id.toLowerCase();
+  }
+
+  @override
+  Future<String?> peekPendingReferrerId() async => pending;
+
+  @override
+  Future<String?> takePendingReferrerId() async {
+    final id = pending;
+    pending = null;
+    return id;
+  }
+
+  @override
+  Future<void> clearPendingReferrerId() async {
+    pending = null;
+  }
+
+  @override
+  void dispose() {}
+}
+
+/// Auto-succeeds checkout so wallet tests do not open the native SDK.
+class FakePaymentCheckout implements PaymentCheckout {
+  @override
+  Future<PaymentSuccess?> open({
+    required String keyId,
+    required String orderId,
+    required int amountPaise,
+    required String name,
+    required String description,
+    String? email,
+    String? contact,
+  }) async =>
+      PaymentSuccess(
+        orderId: orderId,
+        paymentId: 'pay_fake',
+        signature: 'sig_fake',
+      );
+
+  @override
+  void dispose() {}
+}
 
 CatalogData sampleCatalog() => CatalogData(
       categories: const ['Festivals', 'Offers', 'Greetings'],
@@ -123,8 +178,13 @@ class FakeBackend {
 
   /// Registers an account without signing in (for login tests).
   void seedAccount(String email, String password, {String name = 'Aarav', int coins = 0}) {
-    accounts[email.toLowerCase()] =
-        FakeAccount('id-${accounts.length}', email, password, name)..coins = coins;
+    final n = accounts.length.toString().padLeft(12, '0');
+    accounts[email.toLowerCase()] = FakeAccount(
+      '00000000-0000-4000-8000-$n',
+      email,
+      password,
+      name,
+    )..coins = coins;
   }
 }
 
@@ -188,6 +248,7 @@ class _FakeUserRepo implements UserRepository {
   Future<UserSnapshot> load() async {
     final a = b.me;
     return UserSnapshot(
+      id: a.id,
       name: a.name,
       email: a.email,
       coins: a.coins,
@@ -211,10 +272,32 @@ class _FakeUserRepo implements UserRepository {
 
   @override
   Future<bool> claimTask(String key) async {
+    if (key == 'refer') {
+      throw const AppException(
+          'Share your invite link. You earn 1 coin when a friend installs and registers.');
+    }
     final a = b.me;
     if (!a.tasks.add(key)) return false;
     a.coins++;
     a.history.insert(0, CoinTx('Task $key', 1));
+    return true;
+  }
+
+  @override
+  Future<bool> acceptReferral(String referrerId) async {
+    final a = b.me;
+    FakeAccount? referrer;
+    for (final x in b.accounts.values) {
+      if (x.id == referrerId) {
+        referrer = x;
+        break;
+      }
+    }
+    if (referrer == null || identical(referrer, a)) return false;
+    if (!a.tasks.add('referred')) return false;
+    referrer.coins++;
+    referrer.history
+        .insert(0, const CoinTx('Friend joined with your invite', 1));
     return true;
   }
 
@@ -230,9 +313,26 @@ class _FakeUserRepo implements UserRepository {
   }
 
   @override
-  Future<void> buyPack(int packId) async {
+  Future<PaymentOrder> createPaymentOrder(int packId) async {
+    final p = b.data.coinPacks.firstWhere((x) => x.id == packId);
+    return PaymentOrder(
+      orderId: 'order_fake_$packId',
+      amountPaise: p.price * 100,
+      currency: 'INR',
+      keyId: 'rzp_test_fake',
+      packName: p.name,
+    );
+  }
+
+  @override
+  Future<void> verifyPayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) async {
+    final packId = int.parse(orderId.replaceFirst('order_fake_', ''));
     final a = b.me;
-    final p = b.data.coinPacks.firstWhere((p) => p.id == packId);
+    final p = b.data.coinPacks.firstWhere((x) => x.id == packId);
     a.coins += p.total;
     a.history.insert(0, CoinTx('Bought ₹${p.price} pack', p.total));
   }

@@ -5,12 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 ///     flutter run --dart-define-from-file=config/supabase.json
 ///
 /// `config/supabase.json` is git-ignored. Only the *publishable* (anon) key
-/// belongs here; every table is protected by Row Level Security.
+/// and Razorpay Key ID belong here; every table is protected by Row Level
+/// Security. The Razorpay Key Secret stays in Supabase Edge Function secrets.
 class SupabaseConfig {
   const SupabaseConfig._();
 
   static const url = String.fromEnvironment('SUPABASE_URL');
   static const publishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+  static const razorpayKeyId = String.fromEnvironment('RAZORPAY_KEY_ID');
 
   static bool get isConfigured => url.isNotEmpty && publishableKey.isNotEmpty;
 

@@ -1,0 +1,2 @@
+-- Temporary test price (₹1). Prefer 10_restore_basic_pack_price.sql to revert.
+-- update public.coin_packs set price_inr = 1 where name = 'Basic';

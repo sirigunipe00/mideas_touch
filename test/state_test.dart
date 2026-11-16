@@ -10,6 +10,7 @@ import 'package:mideas_touch/state/editor_cubit.dart';
 import 'package:mideas_touch/state/nav_cubit.dart';
 import 'package:mideas_touch/state/session_cubit.dart';
 import 'package:mideas_touch/state/settings_cubit.dart';
+import 'package:mideas_touch/services/referral_service.dart';
 import 'package:mideas_touch/state/studio_cubit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,6 +24,7 @@ class Harness {
     catalog = CatalogCubit(this.backend.catalogRepo);
     editor = EditorCubit();
     studio = StudioCubit();
+    referrals = FakeReferralService();
     app = AppController(
       nav: nav,
       session: session,
@@ -32,10 +34,13 @@ class Harness {
       settings: SettingsCubit(),
       auth: this.backend.authRepo,
       users: this.backend.userRepo,
+      payments: FakePaymentCheckout(),
+      referrals: referrals,
     );
   }
 
   final FakeBackend backend;
+  late final FakeReferralService referrals;
   late final NavCubit nav;
   late final SessionCubit session;
   late final CatalogCubit catalog;
@@ -319,6 +324,31 @@ void main() {
       expect(h.session.state.history, hasLength(1));
     });
 
+    test('refer credits the referrer when a friend registers via invite', () async {
+      await h.register(email: 'host@example.com', name: 'Host');
+      final hostId = h.session.state.user!.id;
+      expect(hostId, isNotEmpty);
+      await h.app.logout();
+
+      h.referrals.pending = hostId;
+      await h.register(email: 'friend@example.com', name: 'Friend');
+      expect(h.backend.accounts['host@example.com']!.coins, 1);
+      expect(
+        h.backend.accounts['host@example.com']!.history.first.label,
+        'Friend joined with your invite',
+      );
+      expect(h.referrals.pending, isNull);
+    });
+
+    test('invite URL embeds the signed-in user id', () async {
+      await h.register();
+      expect(h.app.inviteUrl, contains(h.session.state.user!.id));
+      expect(
+        ReferralService.referrerIdFromUri(Uri.parse(h.app.inviteUrl)),
+        h.session.state.user!.id,
+      );
+    });
+
     test('unlocking spends a coin, opens the editor and remembers the design', () async {
       await h.register();
       await h.app.earn('follow');
@@ -348,7 +378,7 @@ void main() {
       await h.register();
       await h.app.buy(h.catalog.state.data.coinPacks[1]);
       expect(h.session.state.coins, 7);
-      expect(h.toast, 'Payment successful (demo)');
+      expect(h.toast, 'Payment successful');
 
       await h.app.sendCoins('', '1');
       expect(h.toast, 'Enter who to send to');

@@ -21,7 +21,13 @@ class MyDesignsScreen extends StatelessWidget {
     final f = s.myDesignsFilter;
     final list = f == 'Recent'
         ? s.designs
-        : s.designs.where((d) => '${d.status}s' == f || d.status == f).toList();
+        : f == 'Shared'
+            ? s.designs
+                .where((d) => d.status == 'Completed' || d.status == 'Shared')
+                .toList()
+            : s.designs
+                .where((d) => '${d.status}s' == f || d.status == f)
+                .toList();
 
     Widget body;
     if (loading) {
@@ -60,7 +66,7 @@ class MyDesignsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(d.name, style: const TextStyle(fontWeight: kSemi)),
-                    Tag(d.status),
+                    Tag(d.status == 'Completed' ? 'Shared' : d.status),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4.2),
                       child: Text('Last edited: ${d.mod}',
@@ -79,7 +85,7 @@ class MyDesignsScreen extends StatelessWidget {
     return Column(children: [
       TitleHeader(t('md')),
       Segmented(
-        options: const ['Recent', 'Drafts', 'Completed'],
+        options: const ['Recent', 'Drafts', 'Shared'],
         selected: f,
         onChanged: context.read<SessionCubit>().setFilter,
       ),

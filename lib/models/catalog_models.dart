@@ -113,6 +113,7 @@ class UserSnapshot {
   const UserSnapshot({
     required this.name,
     required this.email,
+    this.id = '',
     this.role = AccountRole.customer,
     this.coins = 0,
     this.premium = false,
@@ -122,6 +123,7 @@ class UserSnapshot {
     this.designs = const [],
   });
 
+  final String id;
   final String name;
   final String email;
   final AccountRole role;

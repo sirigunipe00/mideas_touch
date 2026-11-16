@@ -23,9 +23,11 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
   `app-assets/templates/diwali-greeting-NN.jpg` (public). Pictures are downloaded into
   memory only (no disk cache).
 - Per-user data: `profiles` (trigger-created), `user_designs`, `unlocked_templates`,
-  `coin_transactions`, `user_tasks`. RLS on all tables. Coins/role/premium can only change
-  through SECURITY DEFINER RPCs (`unlock_template`, `claim_task`, `send_coins`,
-  `buy_coin_pack`). After every RPC the app re-fetches the user snapshot.
+  `coin_transactions`, `user_tasks`, `payment_orders`. RLS on all tables. Coins/role/premium
+  can only change through SECURITY DEFINER RPCs (`unlock_template`, `claim_task`,
+  `send_coins`, `complete_razorpay_payment`). Buy coins: Edge Functions create/verify
+  Razorpay orders, then credit via `complete_razorpay_payment`. After wallet changes the
+  app re-fetches the user snapshot.
 - Local only: logos, fonts, translations, theme/language choice, Supabase auth token
   (handled by supabase_flutter).
 - Old `lib/data/catalog.dart` (dummy data) was deleted.
@@ -33,9 +35,11 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
 ## 4. Code map
 - `lib/data/repositories.dart` — abstract `CatalogRepository`, `AuthRepository`,
   `UserRepository`, `AppException`.
-- `lib/data/supabase/` — `supabase_config.dart` (url/publishable key from
+- `lib/data/supabase/` — `supabase_config.dart` (url/publishable key/Razorpay Key ID from
   `--dart-define-from-file=config/supabase.json`), `supabase_errors.dart`
   (`logBackendError`, `friendlyError`), and the three Supabase repositories.
+- `lib/services/payment_checkout.dart` — Razorpay checkout wrapper.
+- `supabase/functions/` — `create-razorpay-order`, `verify-razorpay-payment`.
 - `lib/data/mappers.dart` — DB row <-> models. `lib/models/catalog_models.dart` — catalogue
   models.
 - `lib/state/catalog_cubit.dart` — loading/ready/error + progressive picture download.
@@ -46,14 +50,16 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
   `test/state_test.dart`, `test/widget_test.dart`.
 
 ## 5. Setup runbook (already applied to the live project)
-1. SQL Editor: `supabase/backend/01_schema.sql`, then `02_seed.sql`.
-   `00_reset_legacy.sql` drops tables; run it only to wipe and start over.
+1. SQL Editor: `supabase/backend/01_schema.sql`, then `02_seed.sql`, then
+   `03_razorpay.sql`. `00_reset_legacy.sql` drops tables; run it only to wipe and start over.
 2. Template pictures are in the `app-assets` bucket under `templates/`. The app
    downloads them; they are not stored in the project.
 3. Authentication → Sign In / Providers → Email: **Confirm email** off, minimum
    password length **8**.
-4. `config/supabase.json` (gitignored) holds `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`.
-   `.vscode/launch.json` passes it. CLI:
+4. `config/supabase.json` (gitignored) holds `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
+   and `RAZORPAY_KEY_ID`. Set `RAZORPAY_KEY_SECRET` (and Key ID) in Edge Function secrets.
+   Deploy `create-razorpay-order` and `verify-razorpay-payment`.
+   `.vscode/launch.json` passes the config file. CLI:
    `flutter run --dart-define-from-file=config/supabase.json`.
 
 ## 6. Known caveats
@@ -62,8 +68,8 @@ Creator mode / Studio publishing is **on hold** (still local only; not backed by
    templates.
 2. New users start with an empty My Designs.
 3. Creator mode, studio publishing and share links are local only (on hold).
-4. `buy_coin_pack` is a demo (`app_settings.demo_payments_enabled = true`): any signed-in
-   user can mint coins. Set it to `false` before launch.
+4. Coin purchases use Razorpay Test Mode. `demo_payments_enabled` is `false`; the old
+   `buy_coin_pack` demo mint stays disabled. Swap to live Razorpay keys when ready.
 5. All 28 pictures decoded at 1024² use roughly 117 MB of memory.
 6. Android `INTERNET` permission is in the main manifest. macOS builds would additionally need
    the `com.apple.security.network.client` entitlement.

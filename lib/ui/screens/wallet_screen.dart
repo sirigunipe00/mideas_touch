@@ -28,25 +28,17 @@ class WalletScreen extends StatelessWidget {
           const SectionTitle('Earn coins'),
           for (final task in cat.data.earnTasks)
             if (task.key == 'refer')
-              if (s.inviteSent && s.done[task.key] != true)
-                MenuRow(
-                  trailing: AppButton('Simulate accepted',
-                      small: true,
-                      style: BtnStyle.ghost,
-                      onTap: () => app.earn(task.key)),
-                  child: _TaskText(task.icon, task.title,
-                      'Invite sent. You get 1 coin when they accept.'),
-                )
-              else
-                _TaskRow(
-                    icon: task.icon,
-                    label: task.title,
-                    subtitle: task.description,
-                    done: s.done[task.key] == true,
-                    button: task.buttonLabel,
-                    onTap: () => context
-                        .read<NavCubit>()
-                        .openSheet(const InviteSheet()))
+              _TaskRow(
+                  icon: task.icon,
+                  label: task.title,
+                  subtitle: s.inviteSent
+                      ? 'Link shared. You get 1 coin when they install & register.'
+                      : task.description,
+                  done: false,
+                  button: task.buttonLabel,
+                  onTap: () => context
+                      .read<NavCubit>()
+                      .openSheet(const InviteSheet()))
             else
               _TaskRow(
                   icon: task.icon,
@@ -64,7 +56,7 @@ class WalletScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4.2),
             child: Text(
-                'Payment is a placeholder for a future integration (UPI may be added later).',
+                'Payments are processed securely by Razorpay.',
                 style: TextStyle(fontSize: 11, color: pal.mu)),
           ),
           const SectionTitle('History'),
