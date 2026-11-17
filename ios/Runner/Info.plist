@@ -4,6 +4,8 @@
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Select images for your Midas's Touch designs.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your exported designs to Photos.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

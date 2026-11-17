@@ -331,7 +331,7 @@ class _DownloadedContent extends StatelessWidget {
     final e = context.watch<EditorCubit>().state;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SheetTitle('✓ Downloaded'),
-      SheetText('${e.fileName}.jpg is saved to your downloads.'),
+      SheetText('${e.fileName}.jpg is saved to your gallery.'),
       if (e.exportImage != null)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -340,7 +340,7 @@ class _DownloadedContent extends StatelessWidget {
               child: Image.memory(e.exportImage!, fit: BoxFit.fitWidth)),
         ),
       const SheetText(
-          'If your browser blocks the download, press and hold the image to save it.',
+          'Open Photos / Gallery to find it under “Midas’s Touch”.',
           size: 11),
       AppButton('Done',
           wide: true, onTap: context.read<NavCubit>().closeSheet),
@@ -406,8 +406,8 @@ class _ShareContent extends StatelessWidget {
     final t = context.watch<SettingsCubit>().state.t;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SheetTitle(t('share')),
-      const SheetText('Share as a file or as a link.'),
-      AppButton('Download & Share',
+      const SheetText('Share as a JPG (no watermark) or as a link.'),
+      AppButton('Share JPG',
           wide: true, onTap: context.app.downloadAndShare),
       const SizedBox(height: 8),
       AppButton('Share Link',

@@ -18,6 +18,7 @@ create table if not exists public.payment_orders (
   razorpay_payment_id  text,
   status               text not null default 'pending'
                          check (status in ('pending', 'paid', 'failed')),
+  user_email           text,   -- copied from profiles on insert/update
   -- Text IST timestamps (same style as templates): 2026-11-13 15-08-19
   created_at           text not null
     default to_char((now() at time zone 'Asia/Kolkata'), 'YYYY-MM-DD HH24-MI-SS'),
@@ -41,6 +42,27 @@ $$;
 drop trigger if exists payment_orders_updated on public.payment_orders;
 create trigger payment_orders_updated before update on public.payment_orders
   for each row execute function public.set_payment_orders_updated_at();
+
+create or replace function public.set_payment_orders_user_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_email is null or btrim(new.user_email) = '' then
+    select email into new.user_email
+    from public.profiles
+    where id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists payment_orders_user_email on public.payment_orders;
+create trigger payment_orders_user_email
+  before insert or update on public.payment_orders
+  for each row execute function public.set_payment_orders_user_email();
 
 alter table public.payment_orders enable row level security;
 

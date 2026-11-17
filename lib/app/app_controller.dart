@@ -534,13 +534,10 @@ class AppController {
     regenerateExport();
   }
 
-  /// "Download & Share" in the share sheet.
-  void downloadAndShare() {
-    final cur = editor.state.design;
-    if (cur == null) return;
-    editor.setFileName(cur.name.toLowerCase().replaceAll(' ', '_'));
-    openExport();
-  }
+  /// "Share JPG" in the share sheet — no watermark.
+  void downloadAndShare() => need(() {
+        unawaited(_shareDesign());
+      });
 
   Future<void> regenerateExport() async {
     final cur = editor.state.design;
@@ -563,32 +560,65 @@ class AppController {
     regenerateExport();
   }
 
-  /// "Download JPG": saves the file and opens the share sheet.
+  /// "Download JPG": saves the image into the device gallery.
   Future<void> download() async {
     if (!session.state.signedIn) {
       _pending = download;
       nav.openSheet(const RegisterSheet());
       return;
     }
+    if (_busy) return;
     final cur = editor.state.design;
     if (cur == null) return;
+    _busy = true;
     try {
-      Uint8List? bytes = editor.state.exportImage;
-      bytes ??= await exporter.renderJpeg(cur,
+      // Always re-render for download so quality / watermark match this action.
+      final bytes = await exporter.renderJpeg(cur,
           quality: editor.state.quality, watermark: _watermark);
-      final name = editor.state.fileName;
-      await _saveAndShare(bytes, name);
+      final name = editor.state.fileName.isEmpty
+          ? cur.name.toLowerCase().replaceAll(' ', '_')
+          : editor.state.fileName;
+      editor.setExportImage(bytes);
+      await exporter.saveToGallery(bytes, name);
       editor.markCompleted();
-      toast('Downloaded $name.jpg');
+      nav.openSheet(const DownloadedSheet());
+      toast('Saved $name.jpg to gallery');
     } catch (e) {
-      nav.openSheet(const ErrorSheet('Export error'));
+      nav.openSheet(ErrorSheet(_exportErrorMessage(e)));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Share the design as a JPG with no watermark.
+  Future<void> _shareDesign() async {
+    if (_busy) return;
+    final cur = editor.state.design;
+    if (cur == null) return;
+    _busy = true;
+    try {
+      final name = editor.state.fileName.isEmpty
+          ? cur.name.toLowerCase().replaceAll(' ', '_')
+          : editor.state.fileName;
+      final bytes = await exporter.renderJpeg(cur,
+          quality: editor.state.quality, watermark: false);
+      final path = await exporter.saveTemp(bytes, name);
+      nav.closeSheet();
+      await exporter.shareFile(path);
+      editor.markCompleted();
+    } catch (e) {
+      nav.openSheet(ErrorSheet(_exportErrorMessage(e)));
+    } finally {
+      _busy = false;
     }
   }
 
   /// Download straight from a template's detail page (`dlT`).
   void downloadTemplate(int id) => need(() async {
+        if (_busy) return;
         final template = catalog.state.byId(id);
         if (template == null) return;
+        _busy = true;
         try {
           final d = await _withPicture(template);
           final bytes = await exporter.renderJpeg(d,
@@ -596,20 +626,24 @@ class AppController {
           final name = d.name.toLowerCase().replaceAll(' ', '_');
           editor.setFileName(name);
           editor.setExportImage(bytes);
-          await _saveAndShare(bytes, name);
+          await exporter.saveToGallery(bytes, name);
           nav.openSheet(const DownloadedSheet());
+          toast('Saved $name.jpg to gallery');
         } catch (e) {
-          nav.openSheet(const ErrorSheet('Export error'));
+          nav.openSheet(ErrorSheet(_exportErrorMessage(e)));
+        } finally {
+          _busy = false;
         }
       });
 
-  Future<void> _saveAndShare(Uint8List bytes, String name) async {
-    final path = await exporter.save(bytes, name);
-    try {
-      await exporter.shareFile(path);
-    } catch (_) {
-      // Saving succeeded; the share sheet is a convenience.
+  String _exportErrorMessage(Object e) {
+    final text = e.toString().toLowerCase();
+    if (text.contains('accessdenied') ||
+        text.contains('permission') ||
+        text.contains('denied')) {
+      return 'Allow photo access to save designs.';
     }
+    return 'Export error';
   }
 
   Future<void> copyLink(DesignModel d) async {

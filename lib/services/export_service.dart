@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:gal/gal.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -29,6 +30,7 @@ Uint8List _encodeJpeg(_EncodeJob job) {
 /// Renders designs to 1080×1080 JPG files and hands them to the OS.
 class ExportService {
   static const int size = 1080;
+  static const String albumName = "Midas's Touch";
 
   /// Renders [design] (the artifact's `ex()`): optionally with the free-plan
   /// watermark. [quality] is `0.5 … 1.0`.
@@ -60,18 +62,29 @@ class ExportService {
     return compute(_encodeJpeg, job);
   }
 
-  /// Saves the JPG into the app's documents folder and returns its path.
-  Future<String> save(Uint8List bytes, String name) async {
-    final dir = await getApplicationDocumentsDirectory();
+  String _safeName(String name) {
     final cleaned =
         name.trim().replaceAll(RegExp(r'[^\w\-\u0900-\u097f]'), '_');
-    final file =
-        File('${dir.path}/${cleaned.isEmpty ? 'design' : cleaned}.jpg');
+    return cleaned.isEmpty ? 'design' : cleaned;
+  }
+
+  /// Writes the JPG to a temp file (for sharing) and returns its path.
+  Future<String> saveTemp(Uint8List bytes, String name) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/${_safeName(name)}.jpg');
     await file.writeAsBytes(bytes, flush: true);
     return file.path;
   }
 
-  /// Opens the system share sheet so the user can store / send the file.
+  /// Saves the JPG into the device photo gallery / Photos library.
+  Future<void> saveToGallery(Uint8List bytes, String name) async {
+    // gal 2.1.x has no putImageBytes(name:); save via temp file so the
+    // gallery entry keeps a readable filename.
+    final path = await saveTemp(bytes, name);
+    await Gal.putImage(path, album: albumName);
+  }
+
+  /// Opens the system share sheet so the user can send the file.
   Future<void> shareFile(String path) =>
       Share.shareXFiles([XFile(path, mimeType: 'image/jpeg')]);
 

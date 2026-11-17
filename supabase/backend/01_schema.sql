@@ -215,6 +215,7 @@ create table public.user_designs (
   background_image_path text,                          -- a path in bucket app-assets
   elements              jsonb  not null default '[]'::jsonb check (jsonb_typeof(elements) = 'array'),
   status                text   not null default 'Draft' check (status in ('Draft', 'Completed')),
+  user_email            text,   -- copied from profiles on insert/update
   created_at            text not null default public.ist_now_text(),
   updated_at            text not null default public.ist_now_text(),   -- drives "Last edited"
   primary key (user_id, id)
@@ -222,6 +223,26 @@ create table public.user_designs (
 create index user_designs_recent_idx on public.user_designs (user_id, updated_at desc);
 create trigger user_designs_updated before update on public.user_designs
   for each row execute function public.set_updated_at();
+
+create or replace function public.set_user_designs_user_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_email is null or btrim(new.user_email) = '' then
+    select email into new.user_email
+    from public.profiles
+    where id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger user_designs_user_email
+  before insert or update on public.user_designs
+  for each row execute function public.set_user_designs_user_email();
 
 create table public.unlocked_templates (
   user_id     uuid   not null references public.profiles (id) on delete cascade,

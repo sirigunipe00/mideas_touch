@@ -35,6 +35,8 @@ dependencies:
   flutter_bloc: ^8.1.6
   share_plus: ^10.0.0
   path_provider: ^2.1.4
+  # Pin: gal >= 2.3 reads flutter.compileSdkVersion (breaks Flutter 3.24).
+  gal: 2.1.4
   image: ^4.2.0
   image_picker: ^1.1.2
   supabase_flutter: ^2.15.4
@@ -44,10 +46,10 @@ dependencies:
   app_links: 6.3.2
 
 dependency_overrides:
-  # app_links >= 6.4 reads `flutter.compileSdkVersion` in its Android build
-  # file, which Flutter 3.24 does not provide (Gradle "unknown property
-  # 'flutter'"). 6.3.2 has the same API. Remove after upgrading Flutter.
+  # app_links >= 6.4 / gal >= 2.3 read `flutter.compileSdkVersion` in Android
+  # build files, which Flutter 3.24 does not provide. Remove after upgrading.
   app_links: 6.3.2
+  gal: 2.1.4
 
 dev_dependencies:
   flutter_test:

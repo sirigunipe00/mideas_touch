@@ -13,14 +13,6 @@ import '../widgets/kit.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  static const _errors = [
-    'Network error',
-    'Search error',
-    'Export error',
-    'Save error',
-    'Share-link generation error',
-  ];
-
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -99,49 +91,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: LanguageSwitch(expand: true),
           ),
-          const SectionTitle('States gallery'),
-          for (final e in ProfileScreen._errors)
-            MenuRow(
-              onTap: () => context.read<NavCubit>().openSheet(ErrorSheet(e)),
-              trailing: const Text('›'),
-              child: Text(e),
-            ),
-          MenuRow(
-            onTap: () => context.read<NavCubit>().go(AppView.expiredLink),
-            trailing: const Text('›'),
-            child: const Text('Expired shared link'),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Column(children: [
+          if (user != null)
+            AppButton('Log out',
+                style: BtnStyle.ghost, wide: true, onTap: context.app.logout),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(0, 18, 0, 8),
+            child: Center(child: BrandLogo(height: 48)),
           ),
-          MenuRow(
-            onTap: context.read<NavCubit>().showSlowDemo,
-            trailing: const Text('›'),
-            child: const Text('Slow network loading screen'),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Column(children: [
-              if (user != null)
-                AppButton('Log out',
-                    style: BtnStyle.ghost, wide: true, onTap: context.app.logout),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 18, 0, 8),
-                child: Center(child: BrandLogo(height: 48)),
-              ),
-              FutureBuilder<PackageInfo>(
-                future: _packageInfo,
-                builder: (context, snap) {
-                  final info = snap.data;
-                  if (info == null) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 18),
-                    child: Text(
-                      'Version ${info.version}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: pal.mu),
-                    ),
-                  );
-                },
-              ),
-            ]),
+          FutureBuilder<PackageInfo>(
+            future: _packageInfo,
+            builder: (context, snap) {
+              final info = snap.data;
+              if (info == null) return const SizedBox.shrink();
+              return Text(
+                'Version ${info.version}',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: pal.mu),
+              );
+            },
           ),
         ]),
       ),
