@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
-import '../../core/theme/palette.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../widgets/common.dart';
@@ -38,7 +37,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: AppField(
                 controller: _q,
-                hint: 'Search designs and images...',
+                hint: 'Search designs...',
                 onChanged: context.read<CatalogCubit>().setQuery,
               ),
             ),
@@ -65,7 +64,6 @@ class _Results extends StatelessWidget {
   Widget build(BuildContext context) {
     final navLoading = context.select<NavCubit, bool>((c) => c.state.loading);
     final cat = context.watch<CatalogCubit>().state;
-    final pal = context.pal;
     if (cat.status == CatalogStatus.error) {
       return ListView(padding: EdgeInsets.zero, children: [
         EmptyState(
@@ -91,46 +89,19 @@ class _Results extends StatelessWidget {
     final designs = cat.templates
         .where((d) => ('${d.name}${d.cat}${d.desc}').toLowerCase().contains(q))
         .toList();
-    final stock = cat.assets;
-    final assets = matchingAssetIndexes(stock, q);
-    if (designs.isEmpty && assets.isEmpty) {
+    if (designs.isEmpty) {
       return ListView(padding: EdgeInsets.zero, children: const [
         EmptyState(title: 'No designs found', message: 'Try another search.'),
       ]);
     }
     return ListView(padding: EdgeInsets.zero, children: [
       const SectionTitle('Designs'),
-      if (designs.isNotEmpty)
-        CardRow(children: [
-          for (final d in designs)
-            Tap(
-                onTap: () => context.app.openTemplate(d.id),
-                child: DesignCard(d)),
-        ])
-      else
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.2),
-            child:
-                Text('No matching designs.', style: TextStyle(color: pal.mu)),
-          ),
-        ),
-      const SectionTitle('Images / Stock Assets'),
-      if (assets.isNotEmpty)
-        ArtifactGrid(columns: 4, children: [
-          for (final i in assets)
-            AssetCell(stock[i].emoji,
-                onTap: () => context.app.toast('Open the editor to add this image')),
-        ])
-      else
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.2),
-            child: Text('No matching images.', style: TextStyle(color: pal.mu)),
-          ),
-        ),
+      CardRow(children: [
+        for (final d in designs)
+          Tap(
+              onTap: () => context.app.openTemplate(d.id),
+              child: DesignCard(d)),
+      ]),
     ]);
   }
 }

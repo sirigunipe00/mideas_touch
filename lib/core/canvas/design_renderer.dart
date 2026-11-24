@@ -73,7 +73,7 @@ void _paintElement(
       _paintShape(canvas, e, box);
       break;
     case ElementKind.image:
-      _paintImage(canvas, e, box.width, images);
+      _paintImage(canvas, e, box, images);
       break;
   }
   canvas.restore();
@@ -133,14 +133,15 @@ void _paintShape(Canvas canvas, DesignElement e, Rect box) {
 }
 
 void _paintImage(
-    Canvas canvas, DesignElement e, double w, ImageLookup images) {
-  final local = Rect.fromLTWH(0, 0, w, w);
-  final rr = RRect.fromRectAndRadius(local, Radius.circular(w * .06));
+    Canvas canvas, DesignElement e, Rect box, ImageLookup images) {
+  final local = Rect.fromLTWH(0, 0, box.width, box.height);
+  final radius = math.min(box.width, box.height) * .06;
+  final rr = RRect.fromRectAndRadius(local, Radius.circular(radius));
   final uploaded = images(e.image);
   final hasUpload = e.image != null;
 
-  // Photo card: `box-shadow: 0 4px 14px rgba(0,0,0,.25)`; plain images get a
-  // `drop-shadow(0 6px 8px rgba(0,0,0,.3))` instead.
+  // Photo-card chrome only while the original backdrop is still present.
+  // After background removal there must be no rectangular shadow/halo.
   if (e.photo) {
     canvas.drawRRect(
         rr.shift(const Offset(0, 4)),
@@ -154,29 +155,25 @@ void _paintImage(
             ..shader = const CssLinearGradient(
                 135, [Color(0xFFFFFFFF), Color(0xFFFCF4D3)]).createShader(local));
     }
-  } else if (hasUpload) {
-    canvas.drawRRect(
-        rr.shift(const Offset(0, 6)),
-        Paint()
-          ..color = const Color.fromRGBO(0, 0, 0, .3)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
   }
 
   if (hasUpload) {
     if (uploaded != null) {
       canvas.save();
-      canvas.clipRRect(rr);
+      // Keep rounded clip only for photo cards; cutouts need full transparency.
+      if (e.photo) canvas.clipRRect(rr);
       _drawCover(canvas, uploaded, local);
       canvas.restore();
     }
     return;
   }
 
+  final side = math.min(box.width, box.height);
   final tp = TextPainter(
     text: TextSpan(
       text: e.emoji,
       style: TextStyle(
-        fontSize: w * .62,
+        fontSize: side * .62,
         height: 1,
         leadingDistribution: TextLeadingDistribution.even,
         color: const Color(0xFF000000),
@@ -192,7 +189,9 @@ void _paintImage(
     ),
     textDirection: TextDirection.ltr,
   )..layout();
-  tp.paint(canvas, Offset((w - tp.width) / 2, (w - tp.height) / 2));
+  tp.paint(
+      canvas,
+      Offset((box.width - tp.width) / 2, (box.height - tp.height) / 2));
 }
 
 /// Editing chrome: selection outline, resize and rotate handles.
@@ -232,8 +231,7 @@ void paintGuide(Canvas canvas, double n) {
       Paint()..color = const Color(0xFFED0707));
 }
 
-/// Free-download watermark: the tiled diagonal text and the corner badge
-/// (see `ex()` in the artifact).
+/// Free-download watermark: tiled diagonal text + corner badge.
 void paintWatermark(Canvas canvas, double n) {
   TextPainter tp(String text, double size, FontWeight weight, Color color,
       {List<Shadow>? shadows}) {
@@ -252,18 +250,22 @@ void paintWatermark(Canvas canvas, double n) {
     )..layout();
   }
 
+  // Scale chrome with canvas size (1080 baseline → 2160 at 100% quality).
+  final s = n / 1080;
+
   canvas.saveLayer(Rect.fromLTWH(0, 0, n, n),
       Paint()..color = const Color.fromRGBO(255, 255, 255, .3));
   canvas.translate(n / 2, n / 2);
   canvas.rotate(-math.pi / 6);
-  final tile = tp('Midas’s Touch', 56, FontWeight.w700, const Color(0xFFFFFFFF),
-      shadows: const [
-        Shadow(color: Color.fromRGBO(0, 0, 0, .55), blurRadius: 6)
+  final tile = tp('Midas’s Touch', 56 * s, FontWeight.w700, const Color(0xFFFFFFFF),
+      shadows: [
+        Shadow(
+            color: const Color.fromRGBO(0, 0, 0, .55), blurRadius: 6 * s)
       ]);
   var row = 0;
-  for (double y = -n; y <= n; y += 260, row++) {
-    for (double x = -n; x <= n; x += 440) {
-      final cx = x + (row.isOdd ? 220 : 0);
+  for (double y = -n; y <= n; y += 260 * s, row++) {
+    for (double x = -n; x <= n; x += 440 * s) {
+      final cx = x + (row.isOdd ? 220 * s : 0);
       tile.paint(canvas, Offset(cx - tile.width / 2, y - tile.height / 2));
     }
   }
@@ -272,11 +274,13 @@ void paintWatermark(Canvas canvas, double n) {
   canvas.save();
   canvas.drawRRect(
       RRect.fromRectAndRadius(
-          Rect.fromLTWH(n - 400, n - 84, 370, 56), const Radius.circular(28)),
+          Rect.fromLTWH(n - 400 * s, n - 84 * s, 370 * s, 56 * s),
+          Radius.circular(28 * s)),
       Paint()..color = const Color.fromRGBO(0, 0, 0, .55));
-  final badge = tp('Made with Midas’s Touch', 26, FontWeight.w600,
+  final badge = tp('Made with Midas’s Touch', 26 * s, FontWeight.w600,
       const Color(0xFFEFBF05));
-  badge.paint(canvas,
-      Offset(n - 215 - badge.width / 2, n - 56 - badge.height / 2));
+  badge.paint(
+      canvas,
+      Offset(n - 215 * s - badge.width / 2, n - 56 * s - badge.height / 2));
   canvas.restore();
 }

@@ -17,7 +17,7 @@ class SessionState {
     this.inviteSent = false,
     this.designs = const [],
     this.premium = false,
-    this.myDesignsFilter = 'Recent',
+    this.myDesignsFilter = 'Unlocked',
   });
 
   /// `null` while browsing as a guest.
@@ -51,6 +51,16 @@ class SessionState {
   /// with a coin (creators never lock their own designs).
   bool isLocked(DesignModel d) =>
       !((isCreator && d.by == 'You') || unlocked.contains(d.id));
+
+  /// Catalogue template id for lock / watermark checks.
+  /// Saved edits use [DesignModel.sourceId]; catalogue rows use [DesignModel.id].
+  int templateIdOf(DesignModel d) => d.sourceId ?? d.id;
+
+  /// Locked templates keep a watermark on download; unlocked ones stay clean.
+  bool needsDownloadWatermark(DesignModel d) {
+    if (isCreator && d.by == 'You') return false;
+    return !unlocked.contains(templateIdOf(d));
+  }
 
   SessionState copyWith({
     Object? user = _keep,

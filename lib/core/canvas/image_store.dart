@@ -19,12 +19,20 @@ class ImageStore {
     return _pending[bytes] ??= _decode(bytes);
   }
 
+  /// Drops a cached decode so a replaced picture can be reloaded.
+  static void evict(Uint8List bytes) {
+    _decoded[bytes]?.dispose();
+    _decoded[bytes] = null;
+    _pending[bytes] = null;
+  }
+
   static Future<ui.Image?> _decode(Uint8List bytes) async {
     try {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       return _decoded[bytes] = frame.image;
     } catch (_) {
+      _pending[bytes] = null;
       return null;
     }
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/palette.dart';
+import '../../services/export_service.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/editor_cubit.dart';
 import '../../state/nav_cubit.dart';
@@ -373,12 +374,19 @@ class _ExportContentState extends State<_ExportContent> {
         child: e.exportImage != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.memory(e.exportImage!, fit: BoxFit.fitWidth))
+                child: Image.memory(
+                  e.exportImage!,
+                  key: ValueKey(
+                      '${e.quality}-${e.exportImage!.lengthInBytes}'),
+                  fit: BoxFit.fitWidth,
+                  gaplessPlayback: false,
+                ))
             : const Skeleton(height: 300),
       ),
       const FieldLabel('File name'),
       LiveTextField(value: e.fileName, onChanged: editor.setFileName),
-      FieldLabel('Quality ${(e.quality * 100).round()}%'),
+      FieldLabel(
+          'Quality ${(e.quality * 100).round()}% · ${ExportService.pixelSizeFor(_dragging ?? e.quality)}px'),
       ThemedSlider(
         value: _dragging ?? e.quality,
         min: .5,
@@ -390,9 +398,16 @@ class _ExportContentState extends State<_ExportContent> {
         },
       ),
       const SizedBox(height: 12),
-      const SheetText('Free download includes a Midas’s Touch watermark.',
-          size: 11),
-      const SizedBox(height: 2),
+      if (e.design != null &&
+          context
+              .watch<SessionCubit>()
+              .state
+              .needsDownloadWatermark(e.design!)) ...[
+        const SheetText(
+            'Locked design — download includes a Midas’s Touch watermark. Unlock to download without it.',
+            size: 11),
+        const SizedBox(height: 8),
+      ],
       AppButton('Download JPG', wide: true, onTap: context.app.download),
     ]);
   }
@@ -520,12 +535,7 @@ class _ActionsContent extends StatelessWidget {
       SheetTitle(d.name),
       SheetText('Last edited: ${d.mod}'),
       row('Edit', () => app.editSaved(d.id)),
-      row('Preview', () => nav.go(AppView.preview)),
-      row('Share', () {
-        nav.go(AppView.preview);
-        nav.openSheet(const ShareSheet());
-      }),
-      row('Delete', () => app.deleteSaved(d.id)),
+      row('Share', () => nav.openSheet(const ShareSheet())),
     ]);
   }
 }

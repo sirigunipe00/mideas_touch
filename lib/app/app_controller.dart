@@ -485,8 +485,18 @@ class AppController {
   }
 
   Future<void> removeBackground() async {
+    final e = editor.state.selectedElement;
+    if (e == null || !e.isImage) return;
+    if (e.image == null && !e.photo) {
+      toast('Select an uploaded image first');
+      return;
+    }
     final ok = await editor.removeBackground();
-    if (ok) toast('Background removed');
+    if (ok) {
+      toast('Background removed');
+    } else {
+      toast('Could not remove background');
+    }
   }
 
   // ---- studio ----------------------------------------------------------
@@ -524,7 +534,9 @@ class AppController {
 
   // ---- export / share --------------------------------------------------
 
-  bool get _watermark => !session.state.premium;
+  /// Locked designs get a watermark on download; unlocked ones do not.
+  bool _downloadWatermarkFor(DesignModel d) =>
+      session.state.needsDownloadWatermark(d);
 
   void openExport() => need(_openExport2);
 
@@ -534,7 +546,7 @@ class AppController {
     regenerateExport();
   }
 
-  /// "Share JPG" in the share sheet — no watermark.
+  /// "Share JPG" in the share sheet — always without watermark.
   void downloadAndShare() => need(() {
         unawaited(_shareDesign());
       });
@@ -545,7 +557,8 @@ class AppController {
     final token = ++_exportToken;
     try {
       final bytes = await exporter.renderJpeg(cur,
-          quality: editor.state.quality, watermark: _watermark);
+          quality: editor.state.quality,
+          watermark: _downloadWatermarkFor(cur));
       if (token == _exportToken) editor.setExportImage(bytes);
     } catch (e) {
       if (token == _exportToken) {
@@ -561,6 +574,7 @@ class AppController {
   }
 
   /// "Download JPG": saves the image into the device gallery.
+  /// Locked → watermark; unlocked → clean.
   Future<void> download() async {
     if (!session.state.signedIn) {
       _pending = download;
@@ -572,17 +586,17 @@ class AppController {
     if (cur == null) return;
     _busy = true;
     try {
-      // Always re-render for download so quality / watermark match this action.
       final bytes = await exporter.renderJpeg(cur,
-          quality: editor.state.quality, watermark: _watermark);
+          quality: editor.state.quality,
+          watermark: _downloadWatermarkFor(cur));
       final name = editor.state.fileName.isEmpty
           ? cur.name.toLowerCase().replaceAll(' ', '_')
           : editor.state.fileName;
       editor.setExportImage(bytes);
       await exporter.saveToGallery(bytes, name);
-      editor.markCompleted();
+      await _persistAsShared(cur);
       nav.openSheet(const DownloadedSheet());
-      toast('Saved $name.jpg to gallery');
+      toast('Saved $name.jpg · moved to Shared');
     } catch (e) {
       nav.openSheet(ErrorSheet(_exportErrorMessage(e)));
     } finally {
@@ -590,7 +604,8 @@ class AppController {
     }
   }
 
-  /// Share the design as a JPG with no watermark.
+  /// Share the design as a JPG (no watermark).
+  /// Status becomes Shared only after the user actually completes the share.
   Future<void> _shareDesign() async {
     if (_busy) return;
     final cur = editor.state.design;
@@ -604,12 +619,34 @@ class AppController {
           quality: editor.state.quality, watermark: false);
       final path = await exporter.saveTemp(bytes, name);
       nav.closeSheet();
-      await exporter.shareFile(path);
-      editor.markCompleted();
+      final result = await exporter.shareFile(path);
+      if (result.status == ShareResultStatus.success) {
+        await _persistAsShared(cur);
+        toast('Design moved to Shared');
+      }
+      // dismissed / unavailable → leave as Draft; user cancelled.
     } catch (e) {
       nav.openSheet(ErrorSheet(_exportErrorMessage(e)));
     } finally {
       _busy = false;
+    }
+  }
+
+  /// Sets status to Completed (shown as Shared), updates My Designs, and
+  /// upserts `user_designs` in Supabase.
+  Future<void> _persistAsShared(DesignModel cur) async {
+    final shared = cur.copyWith(status: 'Completed', mod: 'Just now');
+    if (editor.state.design?.id == cur.id) {
+      editor.markSaved(shared, 'Shared just now');
+    }
+    session.saveDesign(shared);
+    session.setFilter('Shared');
+    try {
+      await users.saveDesign(shared);
+    } on AppException catch (e) {
+      toast(e.message);
+    } catch (_) {
+      toast('Could not save Shared status. Try Save, then share again.');
     }
   }
 
@@ -622,7 +659,7 @@ class AppController {
         try {
           final d = await _withPicture(template);
           final bytes = await exporter.renderJpeg(d,
-              quality: .92, watermark: _watermark);
+              quality: .92, watermark: _downloadWatermarkFor(d));
           final name = d.name.toLowerCase().replaceAll(' ', '_');
           editor.setFileName(name);
           editor.setExportImage(bytes);
@@ -655,9 +692,14 @@ class AppController {
 
   Future<void> shareLink(DesignModel d) async {
     try {
-      await Share.share(shareLinkFor(d));
+      final result = await Share.share(shareLinkFor(d));
+      if (result.status == ShareResultStatus.success) {
+        await _persistAsShared(d);
+        toast('Design moved to Shared');
+      }
     } catch (_) {
       await copyLink(d);
+      // Clipboard copy is not a completed share — keep Draft.
     }
   }
 

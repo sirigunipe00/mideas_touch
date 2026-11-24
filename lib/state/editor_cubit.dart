@@ -4,8 +4,10 @@ import 'dart:typed_data';
 import 'package:flutter/painting.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/canvas/geometry.dart';
+import '../core/canvas/image_store.dart';
 import '../models/design_element.dart';
 import '../models/design_model.dart';
+import '../services/background_removal.dart';
 
 enum EditorTool { designs, text, images, elements, background }
 
@@ -116,7 +118,6 @@ class EditorCubit extends Cubit<EditorState> {
 
   DateTime _burstUntil = DateTime.fromMillisecondsSinceEpoch(0);
   _Drag? _drag;
-  Timer? _bgTimer;
 
   DesignModel get _d => state.design!;
 
@@ -147,7 +148,6 @@ class EditorCubit extends Cubit<EditorState> {
 
   /// Opens a design for editing and clears the history.
   void open(DesignModel design, {EditorTool? tool, String saved = ''}) {
-    _bgTimer?.cancel();
     emit(state.copyWith(
       design: design,
       selected: -1,
@@ -209,7 +209,7 @@ class EditorCubit extends Cubit<EditorState> {
   }
 
   /// Slider change (`sl(k, v)`): size and rotation.
-  void slide({double? width, double? rotation}) {
+  void slide({double? width, double? height, double? rotation}) {
     final i = state.selected;
     if (i < 0) return;
     _recordBurst(const Duration(milliseconds: 600));
@@ -218,9 +218,15 @@ class EditorCubit extends Cubit<EditorState> {
       final ratio = width / e.w;
       e = e.copyWith(
         w: width,
-        h: e.isShape ? e.h * ratio : null,
+        // Keep shapes / locked-square images proportional unless height is set.
+        h: e.isShape
+            ? e.h * ratio
+            : (e.isImage && height == null && e.h <= 0 ? width : null),
         size: e.isText ? e.size * ratio : null,
       );
+    }
+    if (height != null && (e.isImage || e.isShape)) {
+      e = e.copyWith(h: height);
     }
     if (rotation != null) e = e.copyWith(r: rotation);
     _replace(i, e);
@@ -262,8 +268,24 @@ class EditorCubit extends Cubit<EditorState> {
     if (e != null && e.isImage) {
       updateSelected((e) => e.copyWith(emoji: emoji, clearImage: true));
     } else {
-      addElement(
-          DesignElement.image(x: 35, y: 35, w: 30, emoji: emoji, photo: true));
+      addElement(DesignElement.image(
+          x: 35, y: 35, w: 30, h: 30, emoji: emoji, photo: true));
+    }
+  }
+
+  /// Add / replace with a picture picked from the device gallery.
+  void addGalleryImage(Uint8List bytes) {
+    final e = state.selectedElement;
+    if (e != null && e.isImage) {
+      updateSelected((e) => e.copyWith(
+            image: bytes,
+            photo: true,
+            emoji: e.emoji.isEmpty ? '🖼' : e.emoji,
+            h: e.h > 0 ? e.h : e.w,
+          ));
+    } else {
+      addElement(DesignElement.image(
+          x: 35, y: 35, w: 30, h: 30, emoji: '🖼', photo: true, image: bytes));
     }
   }
 
@@ -288,28 +310,34 @@ class EditorCubit extends Cubit<EditorState> {
     ));
   }
 
-  /// "Remove Background": a simulated 1.6s operation on the selected image.
-  /// Completes when the background has been removed.
+  /// Removes the backdrop from the selected uploaded image (local processing).
+  /// Emoji-only stickers just drop the photo-card chrome.
   Future<bool> removeBackground() async {
     final i = state.selected;
     final e = state.selectedElement;
-    if (e == null || !e.photo) return false;
+    if (e == null || !e.isImage || !e.photo) return false;
     _record();
     emit(state.copyWith(removingBackground: true));
-    final c = Completer<bool>();
-    _bgTimer?.cancel();
-    _bgTimer = Timer(const Duration(milliseconds: 1600), () {
-      if (isClosed) {
-        c.complete(false);
-        return;
+    try {
+      if (e.image == null) {
+        if (state.design != null && i < _d.els.length) {
+          _replace(i, _d.els[i].copyWith(photo: false));
+        }
+        return true;
       }
+      final cutout = await BackgroundRemoval.remove(e.image!);
+      ImageStore.evict(e.image!);
+      await ImageStore.load(cutout);
+      if (isClosed) return false;
       if (state.design != null && i < _d.els.length) {
-        _replace(i, _d.els[i].copyWith(photo: false));
+        _replace(i, _d.els[i].copyWith(image: cutout, photo: false));
       }
-      emit(state.copyWith(removingBackground: false));
-      c.complete(true);
-    });
-    return c.future;
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (!isClosed) emit(state.copyWith(removingBackground: false));
+    }
   }
 
   void markSaved(DesignModel saved, String label) =>
@@ -370,11 +398,17 @@ class EditorCubit extends Cubit<EditorState> {
       case HitMode.resize:
         final w = math.max(6.0, o.w + dx);
         final q = w / o.w;
-        e = o.copyWith(
-          w: w,
-          h: o.isShape ? o.h * q : null,
-          size: o.isText ? o.size * q : null,
-        );
+        if (o.isImage) {
+          final baseH = o.h > 0 ? o.h : o.w;
+          final h = math.max(6.0, baseH + dy);
+          e = o.copyWith(w: w, h: h);
+        } else {
+          e = o.copyWith(
+            w: w,
+            h: o.isShape ? o.h * q : null,
+            size: o.isText ? o.size * q : null,
+          );
+        }
         break;
       case HitMode.rotate:
         final a = math.atan2(p.dy - drag.center.dy, p.dx - drag.center.dx);
@@ -400,9 +434,4 @@ class EditorCubit extends Cubit<EditorState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _bgTimer?.cancel();
-    return super.close();
-  }
 }

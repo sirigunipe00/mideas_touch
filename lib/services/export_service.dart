@@ -27,17 +27,32 @@ Uint8List _encodeJpeg(_EncodeJob job) {
   return Uint8List.fromList(img.encodeJpg(image, quality: job.quality));
 }
 
-/// Renders designs to 1080×1080 JPG files and hands them to the OS.
+/// Renders designs to JPG files and hands them to the OS.
 class ExportService {
-  static const int size = 1080;
+  /// Baseline / mid export size. 100% quality uses [maxSize].
+  static const int baseSize = 1080;
+  static const int maxSize = 2160;
   static const String albumName = "Midas's Touch";
 
-  /// Renders [design] (the artifact's `ex()`): optionally with the free-plan
-  /// watermark. [quality] is `0.5 … 1.0`.
+  /// Maps slider quality `0.5 … 1.0` → pixel size `1080 … 2160`.
+  static int pixelSizeFor(double quality) {
+    final t = ((quality - 0.5) / 0.5).clamp(0.0, 1.0);
+    return (baseSize + (maxSize - baseSize) * t).round();
+  }
+
+  /// Maps slider quality `0.5 … 1.0` → JPEG quality `55 … 100`
+  /// (low end is intentionally softer so the difference is visible).
+  static int jpegQualityFor(double quality) {
+    final t = ((quality - 0.5) / 0.5).clamp(0.0, 1.0);
+    return (55 + (45 * t)).round().clamp(55, 100);
+  }
+
+  /// Renders [design] to a JPG. [quality] is `0.5 … 1.0` and controls both
+  /// resolution and JPEG compression. Free downloads pass [watermark]: true.
   Future<Uint8List> renderJpeg(
     DesignModel design, {
     required double quality,
-    required bool watermark,
+    bool watermark = false,
   }) async {
     final pictures = <Uint8List>[
       if (design.bi != null) design.bi!,
@@ -45,6 +60,9 @@ class ExportService {
         if (e.image != null) e.image!,
     ];
     await Future.wait(pictures.map(ImageStore.load));
+
+    final size = pixelSizeFor(quality);
+    final jpegQ = jpegQualityFor(quality);
 
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(
@@ -57,9 +75,11 @@ class ExportService {
     raster.dispose();
     picture.dispose();
     if (data == null) throw StateError('Could not render the design.');
-    final job = _EncodeJob(
-        data.buffer.asUint8List(), size, (quality * 100).round());
-    return compute(_encodeJpeg, job);
+
+    // Copy bytes for the isolate — the ByteData view is not transferable.
+    final rgba = Uint8List.fromList(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
+    return compute(_encodeJpeg, _EncodeJob(rgba, size, jpegQ));
   }
 
   String _safeName(String name) {
@@ -85,9 +105,9 @@ class ExportService {
   }
 
   /// Opens the system share sheet so the user can send the file.
-  Future<void> shareFile(String path) =>
+  Future<ShareResult> shareFile(String path) =>
       Share.shareXFiles([XFile(path, mimeType: 'image/jpeg')]);
 
-  Future<void> shareText(String text, {String? subject}) =>
+  Future<ShareResult> shareText(String text, {String? subject}) =>
       Share.share(text, subject: subject);
 }

@@ -77,6 +77,7 @@ class DesignElement {
     required double x,
     required double y,
     required double w,
+    double? h,
     required String emoji,
     bool photo = false,
     Uint8List? image,
@@ -85,6 +86,7 @@ class DesignElement {
             x: x,
             y: y,
             w: w,
+            h: h ?? w,
             emoji: emoji,
             photo: photo,
             image: image);
@@ -118,7 +120,7 @@ class DesignElement {
   int get lineCount => text.split('\n').length;
 
   /// Height in percent of the canvas, as laid out by the artifact's CSS
-  /// (text: `lines × size × 1.15`, images are square, shapes use `h`).
+  /// (text: `lines × size × 1.15`; images / shapes use `h`, falling back to `w`).
   double get heightPercent {
     switch (kind) {
       case ElementKind.text:
@@ -126,7 +128,7 @@ class DesignElement {
       case ElementKind.shape:
         return h;
       case ElementKind.image:
-        return w;
+        return h > 0 ? h : w;
     }
   }
 

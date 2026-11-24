@@ -275,16 +275,29 @@ class DesignCard extends StatelessWidget {
           if (!compact)
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(design.name,
-                        style:
-                            const TextStyle(fontWeight: kSemi, fontSize: 14)),
-                    Text(design.cat,
-                        style: TextStyle(fontSize: 11.67, color: pal.mu)),
-                    const SizedBox(height: 6),
-                  ]),
+              child: SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          design.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: kSemi, fontSize: 14, height: 1.25),
+                        ),
+                      ),
+                      Text(
+                        design.cat,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.67, color: pal.mu),
+                      ),
+                    ]),
+              ),
             ),
         ]),
       ),

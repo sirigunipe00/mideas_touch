@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../app/app_controller.dart';
 import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
@@ -13,6 +15,21 @@ import '../widgets/design_canvas.dart';
 import '../widgets/kit.dart';
 import '../widgets/stage.dart';
 import '../widgets/synced_fields.dart';
+
+Future<void> _pickGalleryImage(
+    BuildContext context, void Function(Uint8List bytes) onPicked) async {
+  try {
+    final f = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 85);
+    if (f == null) return;
+    onPicked(await f.readAsBytes());
+  } catch (_) {
+    if (context.mounted) context.app.toast('Could not open the gallery');
+  }
+}
 
 /// `ED()`: the design editor.
 class EditorScreen extends StatelessWidget {
@@ -44,7 +61,6 @@ class _EditorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pal = context.pal;
     final cubit = context.read<EditorCubit>();
     return ScreenHeader(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -54,18 +70,7 @@ class _EditorHeader extends StatelessWidget {
             label: 'Back',
             onTap: context.read<NavCubit>().back,
             child: const Text('←')),
-        Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(st.design!.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: kSemi)),
-                Text(st.savedLabel.isEmpty ? 'Unsaved' : st.savedLabel,
-                    style: TextStyle(fontSize: 11.67, color: pal.mu)),
-              ]),
-        ),
+        const Spacer(),
         IconBox(
             label: 'Undo',
             dim: !st.canUndo,
@@ -253,6 +258,16 @@ class _ToolPanel extends StatelessWidget {
         body = Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: AppButton(
+              '⬆ Upload from gallery',
+              style: BtnStyle.ghost,
+              wide: true,
+              onTap: () => _pickGalleryImage(
+                  context, cubit.addGalleryImage),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: LiveTextField(
                 value: st.assetQuery,
                 hint: 'Search images...',
@@ -358,11 +373,29 @@ class _PropertyPanel extends StatelessWidget {
           if (e.isImage) ...[
             const SizedBox(height: 10),
             AppButton(
-              e.photo ? '✂ Remove Background' : '✓ Background removed',
+              st.removingBackground
+                  ? 'Removing…'
+                  : (e.photo
+                      ? '✂ Remove Background'
+                      : '✓ Background removed'),
               style: BtnStyle.ghost,
               wide: true,
-              onTap: e.photo ? context.app.removeBackground : null,
+              onTap: (e.photo && !st.removingBackground)
+                  ? context.app.removeBackground
+                  : null,
             ),
+            const FieldLabel('Width'),
+            ThemedSlider(
+                value: e.w,
+                min: 8,
+                max: 90,
+                onChanged: (v) => cubit.slide(width: v)),
+            const FieldLabel('Height'),
+            ThemedSlider(
+                value: e.h > 0 ? e.h : e.w,
+                min: 8,
+                max: 90,
+                onChanged: (v) => cubit.slide(height: v)),
             const FieldLabel('Change image'),
             ArtifactGrid(
               columns: 6,
@@ -378,7 +411,7 @@ class _PropertyPanel extends StatelessWidget {
               ],
             ),
           ],
-          if (!e.isText) ...[
+          if (e.isShape) ...[
             const FieldLabel('Size'),
             ThemedSlider(
                 value: e.w,

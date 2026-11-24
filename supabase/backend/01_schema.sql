@@ -247,9 +247,30 @@ create trigger user_designs_user_email
 create table public.unlocked_templates (
   user_id     uuid   not null references public.profiles (id) on delete cascade,
   template_id bigint not null references public.templates (id) on delete cascade,
+  user_email  text,   -- copied from profiles on insert/update
   unlocked_at text not null default public.ist_now_text(),
   primary key (user_id, template_id)
 );
+
+create or replace function public.set_unlocked_templates_user_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.user_email is null or btrim(new.user_email) = '' then
+    select email into new.user_email
+    from public.profiles
+    where id = new.user_id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger unlocked_templates_user_email
+  before insert or update on public.unlocked_templates
+  for each row execute function public.set_unlocked_templates_user_email();
 
 create table public.coin_transactions (
   id          uuid primary key default gen_random_uuid(),
