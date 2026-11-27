@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../core/canvas/design_renderer.dart';
 import '../../core/canvas/image_store.dart';
+import '../../core/fonts/google_fonts_service.dart';
 import '../../models/design_model.dart';
 
 /// Draws a design (the artifact's `.cv` square). Used for thumbnails,
@@ -32,7 +34,18 @@ class _DesignCanvasState extends State<DesignCanvas> {
   @override
   void initState() {
     super.initState();
+    GoogleFontsService.revision.addListener(_onFontLoaded);
     _decodeImages();
+  }
+
+  @override
+  void dispose() {
+    GoogleFontsService.revision.removeListener(_onFontLoaded);
+    super.dispose();
+  }
+
+  void _onFontLoaded() {
+    if (mounted) setState(() => _version++);
   }
 
   @override
@@ -43,6 +56,8 @@ class _DesignCanvasState extends State<DesignCanvas> {
 
   void _decodeImages() {
     final d = widget.design;
+    // Google Fonts used by this design are downloaded, then the canvas repaints.
+    unawaited(GoogleFontsService.ensureFor(d.els));
     final all = <Uint8List>[
       if (d.bi != null) d.bi!,
       for (final e in d.els)

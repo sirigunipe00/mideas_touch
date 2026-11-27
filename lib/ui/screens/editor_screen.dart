@@ -11,6 +11,7 @@ import '../../state/nav_cubit.dart';
 import '../widgets/color_picker.dart';
 import '../widgets/common.dart';
 import '../widgets/design_canvas.dart';
+import '../widgets/font_picker.dart';
 import '../widgets/kit.dart';
 import '../widgets/stage.dart';
 import '../widgets/synced_fields.dart';
@@ -406,19 +407,18 @@ class _PropertyPanel extends StatelessWidget {
       CommitField(
         value: e.font,
         onCommit: (v) => cubit.updateSelected((x) => x.copyWith(font: v)),
-        suffix: PopupMenuButton<String>(
-          tooltip: 'Fonts',
-          padding: EdgeInsets.zero,
-          color: pal.c,
-          icon: Text('▾', style: TextStyle(color: pal.mu)),
-          onSelected: (v) => cubit.updateSelected((x) => x.copyWith(font: v)),
-          itemBuilder: (_) => [
-            for (final f in context.read<CatalogCubit>().state.fonts)
-              PopupMenuItem(
-                  value: f,
-                  child: Text(f,
-                      style: TextStyle(fontFamily: f, color: pal.tx))),
-          ],
+        suffix: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => showFontPicker(
+            context,
+            current: e.font,
+            catalogFonts: context.read<CatalogCubit>().state.fonts,
+            onPick: (v) => cubit.updateSelected((x) => x.copyWith(font: v)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('▾', style: TextStyle(color: pal.mu)),
+          ),
         ),
       ),
       const FieldLabel('Size'),

@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/painting.dart';
 import '../../models/design_element.dart';
 import '../../models/design_model.dart';
+import '../fonts/google_fonts_service.dart';
 import '../theme/css_gradient.dart';
 import 'geometry.dart';
 
@@ -106,7 +107,7 @@ void _paintElement(
 void _paintText(Canvas canvas, double n, DesignElement e, double boxWidth) {
   final fs = e.size * n / 400;
   final style = TextStyle(
-    fontFamily: e.font,
+    fontFamily: GoogleFontsService.resolve(e.font, bold: e.bold),
     fontFamilyFallback: _devanagari,
     fontSize: fs,
     fontWeight: e.bold ? FontWeight.w700 : FontWeight.w400,

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/canvas/design_renderer.dart';
 import '../core/canvas/image_store.dart';
+import '../core/fonts/google_fonts_service.dart';
 import '../models/design_model.dart';
 
 class _EncodeJob {
@@ -129,6 +130,8 @@ class ExportService {
         if (e.image != null) e.image!,
     ];
     await Future.wait(pictures.map(ImageStore.load));
+    // Exports must draw text in the chosen Google Font, not the fallback.
+    await GoogleFontsService.ensureFor(design.els);
 
     final edge = sourceEdge(design);
     final size = pixelSizeFor(quality, sourceEdge: edge);
