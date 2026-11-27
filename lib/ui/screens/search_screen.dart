@@ -7,8 +7,8 @@ import '../../state/nav_cubit.dart';
 import '../widgets/common.dart';
 import '../widgets/kit.dart';
 
-/// Quick-pick search categories shown above the bottom search bar.
-const _searchCategories = [
+/// Quick-pick categories shared by Home and Search.
+const searchCategories = [
   'Wishes',
   'Happy birthday',
   'Love',
@@ -80,7 +80,7 @@ class _SearchScreenState extends State<SearchScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final label in _searchCategories)
+            for (final label in searchCategories)
               _SearchCategoryChip(
                 label: label,
                 selected: query.toLowerCase() == label.toLowerCase(),

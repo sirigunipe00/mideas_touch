@@ -12,6 +12,7 @@ import '../../state/settings_cubit.dart';
 import '../widgets/coin.dart';
 import '../widgets/common.dart';
 import '../widgets/kit.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -133,16 +134,14 @@ class _CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categories =
-        context.select<CatalogCubit, List<String>>((c) => c.state.categories);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
       child: Row(children: [
-        for (var i = 0; i < categories.length; i++) ...[
+        for (var i = 0; i < searchCategories.length; i++) ...[
           if (i > 0) const SizedBox(width: 8),
-          CategoryChip(categories[i],
-              onTap: () => context.app.chooseCategory(categories[i])),
+          CategoryChip(searchCategories[i],
+              onTap: () => context.app.chooseCategory(searchCategories[i])),
         ]
       ]),
     );
