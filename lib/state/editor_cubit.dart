@@ -260,7 +260,7 @@ class EditorCubit extends Cubit<EditorState> {
   void addElement(DesignElement e) {
     _record();
     // Customer-added layers are always editable.
-    final added = e.locked ? e.copyWith(locked: false) : e;
+    final added = e.copyWith(locked: false, fromTemplate: false);
     final els = [..._d.els, added];
     emit(state.copyWith(
         design: _d.copyWith(els: els), selected: els.length - 1));
@@ -302,13 +302,12 @@ class EditorCubit extends Cubit<EditorState> {
   /// `swap(id)`: apply another template's look to the current design.
   void swapTemplate(DesignModel template) {
     _record();
-    final hasArt = template.bi != null ||
-        (template.biPath != null && template.biPath!.isNotEmpty);
-    // Keep customer-added (unlocked) layers; replace the published base.
-    final extras = [for (final e in _d.els) if (!e.locked) e];
-    final base = hasArt
-        ? const <DesignElement>[]
-        : [for (final e in template.els) e.copyWith(locked: true)];
+    // Keep what the customer added; replace the template's own layers.
+    final extras = [for (final e in _d.els) if (!e.fromTemplate) e];
+    final base = [
+      for (final e in template.els)
+        e.copyWith(locked: !e.isText, fromTemplate: true)
+    ];
     emit(state.copyWith(
       design: _d.copyWith(
           bg: template.bg,

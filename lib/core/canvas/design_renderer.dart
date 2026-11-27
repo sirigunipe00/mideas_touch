@@ -25,13 +25,13 @@ void paintDesign(
   FilterQuality imageQuality = FilterQuality.medium,
 }) {
   _paintBackground(canvas, n, design, images, imageQuality);
-  // Published artwork (Storage JPG) already includes the base design. Locked
-  // template layers must not be redrawn on top — that caused double text when
-  // a creator changed a font (baked pixels + live TextPainter).
-  final publishedArt = images(design.bi) != null ||
-      (design.biPath != null && design.biPath!.isNotEmpty);
+  // When a template has a background picture, non-text template layers
+  // (shapes/images) are already part of that picture, so skip them to avoid
+  // drawing them twice. Text layers are always drawn live so customers can
+  // edit them.
+  final hasPicture = images(design.bi) != null;
   for (final e in design.els) {
-    if (publishedArt && e.locked) continue;
+    if (hasPicture && e.fromTemplate && !e.isText) continue;
     _paintElement(canvas, n, e, images, imageQuality);
   }
 }

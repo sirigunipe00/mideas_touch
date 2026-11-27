@@ -111,10 +111,10 @@ class ExportService {
     return (95 + (5 * t)).round().clamp(95, 100);
   }
 
-  /// True when the export is only the published picture (nothing to redraw).
+  /// True when the export is only the published picture (no layers to draw).
   static bool _backgroundOnly(DesignModel design, {required bool watermark}) {
     if (watermark || design.bi == null) return false;
-    return design.els.every((e) => e.locked);
+    return design.els.isEmpty;
   }
 
   /// Renders [design] to a JPG. [quality] is `0.5 … 1.0` and controls both

@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/account.dart';
 import '../../models/catalog_models.dart';
@@ -107,12 +109,38 @@ class SupabaseCatalogRepository implements CatalogRepository {
         return bytes;
       });
 
+  /// File for [path] in the app's cache folder. Storage paths carry a
+  /// timestamp, so a cached file never goes stale.
+  Future<File?> _cacheFile(String path) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final folder = Directory('${dir.path}/catalog_images');
+      if (!await folder.exists()) await folder.create(recursive: true);
+      return File('${folder.path}/${path.replaceAll(RegExp(r'[^\w.\-]'), '_')}');
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Uint8List?> _download(String path) async {
+    // Read from the phone first. Downloading every picture on every launch
+    // is what used up the Supabase egress quota.
+    final cached = await _cacheFile(path);
+    try {
+      if (cached != null && await cached.exists()) {
+        final bytes = await cached.readAsBytes();
+        if (bytes.isNotEmpty) return bytes;
+      }
+    } catch (_) {}
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        return await _client.storage
+        final bytes = await _client.storage
             .from(SupabaseConfig.assetsBucket)
             .download(path);
+        try {
+          await cached?.writeAsBytes(bytes, flush: true);
+        } catch (_) {}
+        return bytes;
       } catch (e) {
         logBackendError('download $path', e);
         if (attempt == 2) return null;

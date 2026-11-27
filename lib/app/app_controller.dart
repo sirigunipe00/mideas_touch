@@ -401,14 +401,12 @@ class AppController {
       }
       return;
     }
-    // Published picture is the fixed base. Customers only add new layers on
-    // top — never edit the original template text/shapes (avoids double text
-    // when the JPG already contains the design).
-    final hasArt = d.bi != null ||
-        (d.biPath != null && d.biPath!.isNotEmpty);
-    final baseEls = hasArt
-        ? const <DesignElement>[]
-        : [for (final e in d.els) e.copyWith(locked: true)];
+    // Customers can edit the template's text and add their own layers.
+    // Background, shapes and pictures of the template stay frozen.
+    final baseEls = [
+      for (final e in d.els)
+        e.copyWith(locked: !e.isText, fromTemplate: true)
+    ];
     editor.open(
       d.copyWith(
           id: DateTime.now().millisecondsSinceEpoch,

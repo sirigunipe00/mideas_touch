@@ -68,19 +68,21 @@ class StudioForm {
 
   /// Builds the preview / published design (`bt()` in the artifact).
   ///
-  /// When a background picture is uploaded it *is* the published artwork —
-  /// do not stack headline/subtitle layers on top (that caused double text
-  /// in the customer app). Gradient-only uploads still use generated layers.
+  /// The text stays a live layer on top of the background so customers can
+  /// edit it; only shapes and pictures are fixed for them.
   DesignModel toDesign(int id, List<List<Color>> presets) {
     const white = Color(0xFFFFFFFF);
     final bg = gradient >= 0 && gradient < presets.length
         ? presets[gradient]
         : (customBg ?? const [Color(0xFF8A6A00), Color(0xFFEFBF05)]);
-    final List<DesignElement> els;
-    if (bgImage != null) {
-      els = const [];
-    } else {
-      els = [
+    final els = <DesignElement>[
+        if (bgImage != null)
+          const DesignElement.shape(
+              x: 0,
+              y: 0,
+              w: 100,
+              h: 100,
+              fill: Color.fromRGBO(0, 0, 0, .35)),
         DesignElement.text(
             x: 8,
             y: 9,
@@ -100,8 +102,7 @@ class StudioForm {
             shape: ShapeStyle.pill),
         DesignElement.text(
             x: 12, y: 79.6, w: 76, text: subtitle, size: 18, color: white),
-      ];
-    }
+    ];
     return DesignModel(
       id: id,
       name: name.isEmpty ? 'Untitled' : name,

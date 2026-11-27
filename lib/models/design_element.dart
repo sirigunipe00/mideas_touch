@@ -32,8 +32,10 @@ class DesignElement {
     this.shape = ShapeStyle.rect,
     /// Corner radius as % of the shape's shorter side (0 = sharp, 50 = fully round).
     this.corner = 0,
-    /// Template / published base layer — customers can view it but not edit it.
+    /// Template shapes / images — customers can see them but not edit them.
     this.locked = false,
+    /// Part of the published template (not added by the customer).
+    this.fromTemplate = false,
     this.emoji = '',
     this.photo = false,
     this.image,
@@ -115,6 +117,7 @@ class DesignElement {
   final ShapeStyle shape;
   final double corner;
   final bool locked;
+  final bool fromTemplate;
   final String emoji;
   final bool photo;
 
@@ -158,6 +161,7 @@ class DesignElement {
     ShapeStyle? shape,
     double? corner,
     bool? locked,
+    bool? fromTemplate,
     String? emoji,
     bool? photo,
     Uint8List? image,
@@ -182,6 +186,7 @@ class DesignElement {
       shape: shape ?? this.shape,
       corner: corner ?? this.corner,
       locked: locked ?? this.locked,
+      fromTemplate: fromTemplate ?? this.fromTemplate,
       emoji: emoji ?? this.emoji,
       photo: photo ?? this.photo,
       image: clearImage ? null : (image ?? this.image),
@@ -225,6 +230,7 @@ class DesignElement {
         'shape': shape.name,
         'corner': corner,
         'locked': locked,
+        'fromTemplate': fromTemplate,
         'emoji': emoji,
         'photo': photo,
       };
@@ -250,6 +256,7 @@ class DesignElement {
       shape: ShapeStyle.values.asNameMap()[j['shape']] ?? ShapeStyle.rect,
       corner: _num(j['corner'], 0),
       locked: j['locked'] == true,
+      fromTemplate: j['fromTemplate'] == true,
       emoji: (j['emoji'] as String?) ?? '',
       photo: j['photo'] == true,
     );
