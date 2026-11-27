@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app/app_controller.dart';
+import '../../core/theme/palette.dart';
 import '../../state/catalog_cubit.dart';
 import '../../state/nav_cubit.dart';
 import '../widgets/common.dart';
 import '../widgets/kit.dart';
+
+/// Quick-pick search categories shown above the bottom search bar.
+const _searchCategories = [
+  'Wishes',
+  'Happy birthday',
+  'Love',
+  'Anniversary',
+  'Congratulation',
+  'Sorry',
+  'Graduation',
+  'Festival',
+];
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -28,32 +41,111 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  void _applyQuery(String value) {
+    _q.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    context.read<CatalogCubit>().setQuery(value);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pal = context.pal;
+    final query = context.select<CatalogCubit, String>((c) => c.state.query);
+    // Keep the field in sync when a category is chosen from Home.
+    if (_q.text != query && !FocusScope.of(context).hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _q.text != query) {
+          _q.value = TextEditingValue(
+            text: query,
+            selection: TextSelection.collapsed(offset: query.length),
+          );
+        }
+      });
+    }
     return Column(children: [
-      ScreenHeader(children: [
-        Expanded(
-          child: Row(children: [
-            Expanded(
-              child: AppField(
-                controller: _q,
-                hint: 'Search designs...',
-                onChanged: context.read<CatalogCubit>().setQuery,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconBox(
-              label: 'Search by image',
-              onTap: () =>
-                  context.read<NavCubit>().openSheet(const ImageSearchSheet()),
-              child: const Text('📷'),
-            ),
-          ]),
-        ),
-      ]),
       const Expanded(child: _Results()),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Category',
+              style: TextStyle(fontSize: 16, fontWeight: kBold, color: pal.tx)),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final label in _searchCategories)
+              _SearchCategoryChip(
+                label: label,
+                selected: query.toLowerCase() == label.toLowerCase(),
+                onTap: () => _applyQuery(label),
+              ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: Row(children: [
+          Expanded(
+            child: AppField(
+              controller: _q,
+              hint: 'Search designs...',
+              onChanged: context.read<CatalogCubit>().setQuery,
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconBox(
+            label: 'Search by image',
+            onTap: () =>
+                context.read<NavCubit>().openSheet(const ImageSearchSheet()),
+            child: const Text('📷'),
+          ),
+        ]),
+      ),
       const BottomTabs(),
     ]);
+  }
+}
+
+class _SearchCategoryChip extends StatelessWidget {
+  const _SearchCategoryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = context.pal;
+    return Tap(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? pal.p : pal.c,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: pal.p, width: 1.5),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: kSemi,
+            color: selected ? pal.pt : pal.tx,
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -17,21 +17,37 @@ const _devanagari = ['Noto Sans Devanagari'];
 /// background (`bgc`) and every element (`eh`), using the same percent based
 /// geometry and the `cqw` font scaling (`size / 400 × canvas width`).
 void paintDesign(
-    Canvas canvas, double n, DesignModel design, ImageLookup images) {
-  _paintBackground(canvas, n, design, images);
+  Canvas canvas,
+  double n,
+  DesignModel design,
+  ImageLookup images, {
+  FilterQuality imageQuality = FilterQuality.medium,
+}) {
+  _paintBackground(canvas, n, design, images, imageQuality);
+  // Published artwork (Storage JPG) already includes the base design. Locked
+  // template layers must not be redrawn on top — that caused double text when
+  // a creator changed a font (baked pixels + live TextPainter).
+  final publishedArt = images(design.bi) != null ||
+      (design.biPath != null && design.biPath!.isNotEmpty);
   for (final e in design.els) {
-    _paintElement(canvas, n, e, images);
+    if (publishedArt && e.locked) continue;
+    _paintElement(canvas, n, e, images, imageQuality);
   }
 }
 
 void _paintBackground(
-    Canvas canvas, double n, DesignModel d, ImageLookup images) {
+  Canvas canvas,
+  double n,
+  DesignModel d,
+  ImageLookup images,
+  FilterQuality imageQuality,
+) {
   final rect = Rect.fromLTWH(0, 0, n, n);
   canvas.save();
   canvas.clipRect(rect);
   final bi = images(d.bi);
   if (bi != null) {
-    _drawCover(canvas, bi, rect);
+    _drawCover(canvas, bi, rect, imageQuality);
   } else {
     final paint = Paint()
       ..shader = CssLinearGradient(145, d.bg).createShader(rect);
@@ -44,7 +60,8 @@ void _paintBackground(
   canvas.restore();
 }
 
-void _drawCover(Canvas canvas, ui.Image img, Rect dst) {
+void _drawCover(
+    Canvas canvas, ui.Image img, Rect dst, FilterQuality imageQuality) {
   final scale =
       math.max(dst.width / img.width, dst.height / img.height).toDouble();
   final w = img.width * scale;
@@ -55,11 +72,18 @@ void _drawCover(Canvas canvas, ui.Image img, Rect dst) {
       img,
       Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
       target,
-      Paint()..filterQuality = FilterQuality.medium);
+      Paint()
+        ..filterQuality = imageQuality
+        ..isAntiAlias = true);
 }
 
 void _paintElement(
-    Canvas canvas, double n, DesignElement e, ImageLookup images) {
+  Canvas canvas,
+  double n,
+  DesignElement e,
+  ImageLookup images,
+  FilterQuality imageQuality,
+) {
   final box = ElementGeometry.boxOf(e, n);
   canvas.save();
   canvas.translate(box.center.dx, box.center.dy);
@@ -73,7 +97,7 @@ void _paintElement(
       _paintShape(canvas, e, box);
       break;
     case ElementKind.image:
-      _paintImage(canvas, e, box, images);
+      _paintImage(canvas, e, box, images, imageQuality);
       break;
   }
   canvas.restore();
@@ -117,23 +141,35 @@ void _paintShape(Canvas canvas, DesignElement e, Rect box) {
   final local = Rect.fromLTWH(0, 0, box.width, box.height);
   final paint = Paint()..color = e.fill;
   switch (e.shape) {
-    case ShapeStyle.rect:
-      canvas.drawRect(local, paint);
-      break;
     case ShapeStyle.ellipse:
       canvas.drawOval(local, paint);
       break;
+    case ShapeStyle.rect:
     case ShapeStyle.pill:
-      canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              local, Radius.circular(math.min(box.width, box.height) / 2)),
-          paint);
+      // `corner` is % of the shorter side (0 = sharp, 50 = fully round).
+      // Pills default to fully round when corner was never set.
+      final maxR = math.min(box.width, box.height) / 2;
+      final cornerPct = e.corner > 0
+          ? e.corner
+          : (e.shape == ShapeStyle.pill ? 50.0 : 0.0);
+      final radius = maxR * (cornerPct.clamp(0, 50) / 50);
+      if (radius <= 0) {
+        canvas.drawRect(local, paint);
+      } else {
+        canvas.drawRRect(
+            RRect.fromRectAndRadius(local, Radius.circular(radius)), paint);
+      }
       break;
   }
 }
 
 void _paintImage(
-    Canvas canvas, DesignElement e, Rect box, ImageLookup images) {
+  Canvas canvas,
+  DesignElement e,
+  Rect box,
+  ImageLookup images,
+  FilterQuality imageQuality,
+) {
   final local = Rect.fromLTWH(0, 0, box.width, box.height);
   final radius = math.min(box.width, box.height) * .06;
   final rr = RRect.fromRectAndRadius(local, Radius.circular(radius));
@@ -162,7 +198,7 @@ void _paintImage(
       canvas.save();
       // Keep rounded clip only for photo cards; cutouts need full transparency.
       if (e.photo) canvas.clipRRect(rr);
-      _drawCover(canvas, uploaded, local);
+      _drawCover(canvas, uploaded, local, imageQuality);
       canvas.restore();
     }
     return;
@@ -253,14 +289,15 @@ void paintWatermark(Canvas canvas, double n) {
   // Scale chrome with canvas size (1080 baseline → 2160 at 100% quality).
   final s = n / 1080;
 
+  // Lighter diagonal watermark so the design stays readable.
   canvas.saveLayer(Rect.fromLTWH(0, 0, n, n),
-      Paint()..color = const Color.fromRGBO(255, 255, 255, .3));
+      Paint()..color = const Color.fromRGBO(255, 255, 255, .14));
   canvas.translate(n / 2, n / 2);
   canvas.rotate(-math.pi / 6);
   final tile = tp('Midas’s Touch', 56 * s, FontWeight.w700, const Color(0xFFFFFFFF),
       shadows: [
         Shadow(
-            color: const Color.fromRGBO(0, 0, 0, .55), blurRadius: 6 * s)
+            color: const Color.fromRGBO(0, 0, 0, .28), blurRadius: 5 * s)
       ]);
   var row = 0;
   for (double y = -n; y <= n; y += 260 * s, row++) {

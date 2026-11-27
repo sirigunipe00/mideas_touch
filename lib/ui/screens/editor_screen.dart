@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../app/app_controller.dart';
-import '../../core/theme/css_gradient.dart';
 import '../../core/theme/palette.dart';
 import '../../models/design_element.dart';
 import '../../state/catalog_cubit.dart';
@@ -86,7 +85,7 @@ class _EditorHeader extends StatelessWidget {
             onTap: () => context.read<NavCubit>().go(AppView.preview),
             child: const Text('👁')),
         AppButton('Save', small: true, onTap: context.app.save),
-        AppButton('⬆', small: true, onTap: context.app.openExport),
+        AppButton('Export', small: true, onTap: context.app.openExport),
       ],
     );
   }
@@ -174,7 +173,6 @@ class _ToolBar extends StatelessWidget {
     (EditorTool.text, 'T', 'Text'),
     (EditorTool.images, '🌄', 'Images'),
     (EditorTool.elements, '◆', 'Elements'),
-    (EditorTool.background, '🎨', 'Background'),
   ];
 
   @override
@@ -228,7 +226,6 @@ class _ToolPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final pal = context.pal;
     final cubit = context.read<EditorCubit>();
-    final stock = context.watch<CatalogCubit>().state.assets;
     Widget body;
     switch (st.tool!) {
       case EditorTool.text:
@@ -253,42 +250,16 @@ class _ToolPanel extends StatelessWidget {
                 child: DesignCard(d, width: 84, compact: true)),
         ]);
       case EditorTool.images:
-        final q = st.assetQuery.toLowerCase();
-        final matches = matchingAssetIndexes(stock, q);
-        body = Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: AppButton(
-              '⬆ Upload from gallery',
-              style: BtnStyle.ghost,
-              wide: true,
-              onTap: () => _pickGalleryImage(
-                  context, cubit.addGalleryImage),
-            ),
+        body = Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: AppButton(
+            '⬆ Upload from gallery',
+            style: BtnStyle.ghost,
+            wide: true,
+            onTap: () =>
+                _pickGalleryImage(context, cubit.addGalleryImage),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: LiveTextField(
-                value: st.assetQuery,
-                hint: 'Search images...',
-                onChanged: cubit.setAssetQuery),
-          ),
-          if (matches.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child:
-                      Text('No images found', style: TextStyle(color: pal.mu))),
-            )
-          else
-            ArtifactGrid(columns: 4, children: [
-              for (final i in matches)
-                AssetCell(stock[i].emoji,
-                    fontSize: 24,
-                    onTap: () => cubit.addStockImage(stock[i].emoji)),
-            ]),
-        ]);
+        );
       case EditorTool.elements:
         body = ArtifactGrid(columns: 4, children: [
           AssetCell('●',
@@ -299,20 +270,8 @@ class _ToolPanel extends StatelessWidget {
               fontSize: 24, onTap: () => cubit.addElement(NewElements.bar)),
         ]);
       case EditorTool.background:
-        body = ArtifactGrid(columns: 6, children: [
-          for (final b in context.watch<CatalogCubit>().state.backgrounds)
-            Tap(
-              onTap: () => cubit.setBackground(b),
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: CssLinearGradient(145, b),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: pal.ln),
-                ),
-              ),
-            ),
-        ]);
+        // Background tool removed from the toolbar.
+        body = const SizedBox.shrink();
     }
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -384,6 +343,18 @@ class _PropertyPanel extends StatelessWidget {
                   ? context.app.removeBackground
                   : null,
             ),
+            const FieldLabel('Adjust Size'),
+            ThemedSlider(
+                value: e.w,
+                min: 8,
+                max: 90,
+                onChanged: (v) {
+                  final baseH = e.h > 0 ? e.h : e.w;
+                  final ratio = e.w == 0 ? 1.0 : baseH / e.w;
+                  cubit.slide(width: v, height: (v * ratio).clamp(8, 90));
+                }),
+          ],
+          if (e.isShape) ...[
             const FieldLabel('Width'),
             ThemedSlider(
                 value: e.w,
@@ -393,31 +364,19 @@ class _PropertyPanel extends StatelessWidget {
             const FieldLabel('Height'),
             ThemedSlider(
                 value: e.h > 0 ? e.h : e.w,
-                min: 8,
+                min: 4,
                 max: 90,
                 onChanged: (v) => cubit.slide(height: v)),
-            const FieldLabel('Change image'),
-            ArtifactGrid(
-              columns: 6,
-              padding: EdgeInsets.zero,
-              children: [
-                for (final a in context
-                    .read<CatalogCubit>()
-                    .state
-                    .assets
-                    .take(6))
-                  AssetCell(a.emoji,
-                      fontSize: 20, onTap: () => cubit.addStockImage(a.emoji)),
-              ],
-            ),
-          ],
-          if (e.isShape) ...[
-            const FieldLabel('Size'),
-            ThemedSlider(
-                value: e.w,
-                min: 8,
-                max: 90,
-                onChanged: (v) => cubit.slide(width: v)),
+            if (e.shape != ShapeStyle.ellipse) ...[
+              const FieldLabel('Corners'),
+              ThemedSlider(
+                  value: e.corner > 0
+                      ? e.corner
+                      : (e.shape == ShapeStyle.pill ? 50 : 0),
+                  min: 0,
+                  max: 50,
+                  onChanged: (v) => cubit.slide(corner: v)),
+            ],
           ],
           const FieldLabel('Rotate'),
           ThemedSlider(
@@ -433,8 +392,10 @@ class _PropertyPanel extends StatelessWidget {
   List<Widget> _textControls(
       BuildContext context, EditorCubit cubit, DesignElement e) {
     final pal = context.pal;
-    Widget toggle(Widget label, bool on, VoidCallback onTap) =>
-        IconBox(on: on, onTap: onTap, child: label);
+    Widget toggle(Widget label, bool on, VoidCallback onTap) => SizedBox(
+          width: double.infinity,
+          child: IconBox(on: on, onTap: onTap, child: label),
+        );
     return [
       const FieldLabel('Text'),
       LiveTextField(
@@ -492,26 +453,44 @@ class _PropertyPanel extends StatelessWidget {
           onChanged: (c) => cubit.updateSelected((x) => x.copyWith(color: c)),
         ),
       ]),
-      const FieldLabel('Style and alignment'),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        toggle(const Text('B', style: TextStyle(fontWeight: kSemi)), e.bold,
-            () => cubit.updateSelected((x) => x.copyWith(bold: !x.bold))),
-        toggle(const Text('I', style: TextStyle(fontStyle: FontStyle.italic)),
-            e.italic,
-            () => cubit.updateSelected((x) => x.copyWith(italic: !x.italic))),
-        toggle(
-            const Text('U',
-                style: TextStyle(decoration: TextDecoration.underline)),
-            e.underline,
-            () => cubit
-                .updateSelected((x) => x.copyWith(underline: !x.underline))),
+      const FieldLabel('Style'),
+      Row(children: [
+        Expanded(
+          child: toggle(
+              const Text('B', style: TextStyle(fontWeight: kSemi)), e.bold,
+              () => cubit.updateSelected((x) => x.copyWith(bold: !x.bold))),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: toggle(
+              const Text('I', style: TextStyle(fontStyle: FontStyle.italic)),
+              e.italic,
+              () =>
+                  cubit.updateSelected((x) => x.copyWith(italic: !x.italic))),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: toggle(
+              const Text('U',
+                  style: TextStyle(decoration: TextDecoration.underline)),
+              e.underline,
+              () => cubit.updateSelected(
+                  (x) => x.copyWith(underline: !x.underline))),
+        ),
+      ]),
+      const FieldLabel('Alignment'),
+      Row(children: [
         for (final a in const [
           (TextAlign.left, 'Left'),
           (TextAlign.center, 'Center'),
           (TextAlign.right, 'Right'),
-        ])
-          toggle(Text(a.$2), e.align == a.$1,
-              () => cubit.updateSelected((x) => x.copyWith(align: a.$1))),
+        ]) ...[
+          if (a.$1 != TextAlign.left) const SizedBox(width: 8),
+          Expanded(
+            child: toggle(Text(a.$2), e.align == a.$1,
+                () => cubit.updateSelected((x) => x.copyWith(align: a.$1))),
+          ),
+        ],
       ]),
     ];
   }

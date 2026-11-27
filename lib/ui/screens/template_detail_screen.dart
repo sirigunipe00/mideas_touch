@@ -24,7 +24,6 @@ class TemplateDetailScreen extends StatelessWidget {
       return const Column(children: [BackHeader('')]);
     }
     final locked = session.isLocked(d);
-    final desc = d.desc.isEmpty ? 'A ready-made promotional creative.' : d.desc;
     return Column(children: [
       BackHeader(d.name),
       Expanded(
@@ -56,8 +55,6 @@ class TemplateDetailScreen extends StatelessWidget {
                     text: 'By ${d.by}',
                     style: TextStyle(fontSize: 12, color: pal.mu)),
               ])),
-              MutedText(
-                  '$desc A ready-made promotional creative that can be customized with your own text and images.'),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(children: [

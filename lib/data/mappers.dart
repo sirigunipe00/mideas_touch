@@ -42,6 +42,7 @@ DesignModel templateFromRow(Map<String, dynamic> r) {
 DesignElement elementFromRow(Map<String, dynamic> r) {
   final x = _n(r['x']), y = _n(r['y']), w = _n(r['w']);
   final rotation = _n(r['rotation']);
+  // Catalogue layers are the published base — customers may only add on top.
   switch (r['kind']) {
     case 'shape':
       return DesignElement(
@@ -54,6 +55,7 @@ DesignElement elementFromRow(Map<String, dynamic> r) {
         fill: hex((r['fill'] as String?) ?? '#fde68a'),
         shape: ShapeStyle.values.asNameMap()[r['shape_style']] ??
             ShapeStyle.rect,
+        locked: true,
       );
     case 'image':
       return DesignElement(
@@ -64,6 +66,7 @@ DesignElement elementFromRow(Map<String, dynamic> r) {
         r: rotation,
         emoji: (r['emoji'] as String?) ?? '',
         photo: r['is_photo'] == true,
+        locked: true,
       );
     default:
       return DesignElement(
@@ -81,6 +84,7 @@ DesignElement elementFromRow(Map<String, dynamic> r) {
         underline: r['underline'] == true,
         align: TextAlign.values.asNameMap()[r['text_align']] ??
             TextAlign.center,
+        locked: true,
       );
   }
 }

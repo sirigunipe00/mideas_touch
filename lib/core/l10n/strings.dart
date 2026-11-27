@@ -11,14 +11,14 @@ class Strings {
       'sub': 'Pick a design, customize it, and share your design.',
       'start': 'Start Creating',
       'ph': 'Search designs, occasions...',
-      'pop': 'Popular Designs',
+      'pop': 'Popular Designs', 
       'trend': 'Trending Designs',
       'rec': 'Recently Added',
       'use': 'Use',
       'tag': 'Create. Customize. Share.',
       'save': 'Save',
       'prev': 'Preview',
-      'cust': 'Customize Design',
+      'cust': 'Edit - 1 Coin',
       'sbi': 'Search by Image',
       'cat': 'Categories',
       'exp': 'Export JPG',
@@ -65,29 +65,24 @@ class Strings {
   /// Mirrors the artifact's `t(key)`.
   String call(String key) => _tr[lang]?[key] ?? _tr['en']![key] ?? key;
 
-  // Onboarding / welcome modal copy (hard-coded per language in the artifact).
-  String get introTitle =>
-      isHindi ? 'Midas\'s Touch में आपका स्वागत है' : 'Welcome to Midas\'s Touch';
+  // Onboarding / welcome modal copy.
+  String get introEyebrow => isHindi ? 'स्वागत है' : 'WELCOME TO';
 
-  List<List<String>> get introPoints => isHindi
-      ? const [
-          ['🔍', 'डिज़ाइन मुफ़्त में देखें'],
-          ['📝', 'डाउनलोड के लिए रजिस्टर करें'],
-          [
-            '🪙',
-            'कॉइन से बदलें · हर डिज़ाइन के लिए 1 कॉइन, बाद में दोबारा इस्तेमाल करें'
-          ],
-        ]
-      : const [
-          ['🔍', 'Explore designs for free'],
-          ['📝', 'Register to download your design'],
-          [
-            '🪙',
-            'Customise with coins · 1 coin per design, reuse it anytime'
-          ],
-        ];
+  // String get introTagline =>
+  //     isHindi ? 'अपना जादू पर्सनलाइज़ करें' : 'Personalise your Magic';
 
-  String get introStart => isHindi ? 'शुरू करें' : 'Start exploring';
+  String get introLine1 =>
+      isHindi ? 'सुंदर निमंत्रण बनाएँ' : 'Create graceful invites';
+
+  String get introLine2 => isHindi
+      ? 'मुफ़्त डिज़ाइन और इमेज पाएँ'
+      : 'Get free designs & images';
+
+  String get introLine3 => isHindi
+      ? 'आसानी से डाउनलोड करें और भेजें'
+      : 'Download & forward effortlessly';
+
+  String get introStart => isHindi ? 'शुरू करें' : 'Start Exploring';
 
   String get downloadLabel => isHindi ? 'डाउनलोड' : 'Download';
 }

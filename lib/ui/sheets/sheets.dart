@@ -386,7 +386,7 @@ class _ExportContentState extends State<_ExportContent> {
       const FieldLabel('File name'),
       LiveTextField(value: e.fileName, onChanged: editor.setFileName),
       FieldLabel(
-          'Quality ${(e.quality * 100).round()}% · ${ExportService.pixelSizeFor(_dragging ?? e.quality)}px'),
+          'Quality ${(e.quality * 100).round()}% · ${ExportService.pixelSizeFor(_dragging ?? e.quality, sourceEdge: e.design == null ? 0 : ExportService.sourceEdge(e.design!))}px'),
       ThemedSlider(
         value: _dragging ?? e.quality,
         min: .5,
@@ -618,34 +618,80 @@ class IntroOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.watch<SettingsCubit>().state.t;
+    final pal = context.pal;
     return SheetScrim(
       centered: true,
       child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        const SizedBox(height: 4),
+        Text(
+          t.introEyebrow,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: kSemi,
+            letterSpacing: 1.4,
+            color: pal.mu,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const BrandLogo(height: 72),
+        const SizedBox(height: 10),
+        const _IntroStars(),
+        const SizedBox(height: 8),
+        // Text(
+        //   t.introTagline,
+        //   textAlign: TextAlign.center,
+        //   style: TextStyle(fontSize: 13, fontWeight: kSemi, color: pal.tx),
+        // ),
+        const SizedBox(height: 18),
+        Text(
+          t.introLine1,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, fontWeight: kSemi, color: pal.tx),
+        ),
         const SizedBox(height: 6),
-        Text(t.introTitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 17, fontWeight: kBold)),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(children: [
-            for (final p in t.introPoints)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(children: [
-                  CoinText(p[0], coinSize: 22, style: const TextStyle(fontSize: 22)),
-                  const SizedBox(width: 8),
-                  Expanded(child: CoinText(p[1])),
-                ]),
-              ),
-          ]),
+        Text(
+          t.introLine2,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 17, fontWeight: kBold),
         ),
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
-          child: LanguageSwitch(),
+        const SizedBox(height: 6),
+        Text(
+          t.introLine3,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12.5, color: pal.mu),
         ),
+        const SizedBox(height: 20),
         AppButton(t.introStart,
             wide: true, onTap: context.read<NavCubit>().dismissIntro),
+        const SizedBox(height: 14),
+        const LanguageSwitch(),
+        const SizedBox(height: 4),
       ]),
+    );
+  }
+}
+
+class _IntroStars extends StatelessWidget {
+  const _IntroStars();
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFEFBF05);
+    Widget star(IconData icon, {Color? color}) => Icon(
+          icon,
+          size: 18,
+          color: color ?? gold,
+        );
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        star(Icons.star_rounded),
+        star(Icons.star_rounded),
+        star(Icons.star_rounded),
+        star(Icons.star_rounded),
+        star(Icons.star_half_rounded),
+      ],
     );
   }
 }

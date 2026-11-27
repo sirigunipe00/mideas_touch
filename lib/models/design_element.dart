@@ -30,6 +30,10 @@ class DesignElement {
     this.align = TextAlign.center,
     this.fill = const Color(0xFFFDE68A),
     this.shape = ShapeStyle.rect,
+    /// Corner radius as % of the shape's shorter side (0 = sharp, 50 = fully round).
+    this.corner = 0,
+    /// Template / published base layer — customers can view it but not edit it.
+    this.locked = false,
     this.emoji = '',
     this.photo = false,
     this.image,
@@ -64,6 +68,7 @@ class DesignElement {
     required double h,
     required Color fill,
     ShapeStyle shape = ShapeStyle.rect,
+    double corner = 0,
   }) : this(
             kind: ElementKind.shape,
             x: x,
@@ -71,7 +76,8 @@ class DesignElement {
             w: w,
             h: h,
             fill: fill,
-            shape: shape);
+            shape: shape,
+            corner: corner);
 
   const DesignElement.image({
     required double x,
@@ -107,6 +113,8 @@ class DesignElement {
   final TextAlign align;
   final Color fill;
   final ShapeStyle shape;
+  final double corner;
+  final bool locked;
   final String emoji;
   final bool photo;
 
@@ -148,6 +156,8 @@ class DesignElement {
     TextAlign? align,
     Color? fill,
     ShapeStyle? shape,
+    double? corner,
+    bool? locked,
     String? emoji,
     bool? photo,
     Uint8List? image,
@@ -170,6 +180,8 @@ class DesignElement {
       align: align ?? this.align,
       fill: fill ?? this.fill,
       shape: shape ?? this.shape,
+      corner: corner ?? this.corner,
+      locked: locked ?? this.locked,
       emoji: emoji ?? this.emoji,
       photo: photo ?? this.photo,
       image: clearImage ? null : (image ?? this.image),
@@ -211,6 +223,8 @@ class DesignElement {
         'align': align.name,
         'fill': _hex(fill),
         'shape': shape.name,
+        'corner': corner,
+        'locked': locked,
         'emoji': emoji,
         'photo': photo,
       };
@@ -234,6 +248,8 @@ class DesignElement {
       align: TextAlign.values.asNameMap()[j['align']] ?? TextAlign.center,
       fill: _color(j['fill'], const Color(0xFFFDE68A)),
       shape: ShapeStyle.values.asNameMap()[j['shape']] ?? ShapeStyle.rect,
+      corner: _num(j['corner'], 0),
+      locked: j['locked'] == true,
       emoji: (j['emoji'] as String?) ?? '',
       photo: j['photo'] == true,
     );

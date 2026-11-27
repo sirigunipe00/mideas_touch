@@ -47,18 +47,21 @@ class ElementGeometry {
       List<DesignElement> els, double n, int selected, Offset p) {
     if (selected >= 0 && selected < els.length) {
       final e = els[selected];
-      final box = boxOf(e, n);
-      final l = toLocal(e, n, p);
-      if ((l - Offset(box.width, box.height)).distance <= handleHitRadius) {
-        return Hit(selected, HitMode.resize);
-      }
-      if ((l - Offset(box.width / 2, -rotateHandleOffset)).distance <=
-          handleHitRadius) {
-        return Hit(selected, HitMode.rotate);
+      if (!e.locked) {
+        final box = boxOf(e, n);
+        final l = toLocal(e, n, p);
+        if ((l - Offset(box.width, box.height)).distance <= handleHitRadius) {
+          return Hit(selected, HitMode.resize);
+        }
+        if ((l - Offset(box.width / 2, -rotateHandleOffset)).distance <=
+            handleHitRadius) {
+          return Hit(selected, HitMode.rotate);
+        }
       }
     }
     for (var i = els.length - 1; i >= 0; i--) {
       final e = els[i];
+      if (e.locked) continue; // published base — not selectable
       final box = boxOf(e, n);
       final l = toLocal(e, n, p);
       if (l.dx >= 0 && l.dx <= box.width && l.dy >= 0 && l.dy <= box.height) {

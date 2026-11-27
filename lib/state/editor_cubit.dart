@@ -32,7 +32,7 @@ class EditorState {
     this.guide = false,
     this.savedLabel = '',
     this.fileName = 'design',
-    this.quality = .9,
+    this.quality = 1,
     this.exportImage,
   });
 
@@ -197,7 +197,7 @@ class EditorCubit extends Cubit<EditorState> {
   /// Replaces the selected element (`sp(k, v)`), recording history.
   void updateSelected(DesignElement Function(DesignElement e) change) {
     final i = state.selected;
-    if (i < 0) return;
+    if (i < 0 || _d.els[i].locked) return;
     _record();
     _replace(i, change(_d.els[i]));
   }
@@ -209,24 +209,26 @@ class EditorCubit extends Cubit<EditorState> {
   }
 
   /// Slider change (`sl(k, v)`): size and rotation.
-  void slide({double? width, double? height, double? rotation}) {
+  void slide({double? width, double? height, double? rotation, double? corner}) {
     final i = state.selected;
-    if (i < 0) return;
+    if (i < 0 || _d.els[i].locked) return;
     _recordBurst(const Duration(milliseconds: 600));
     var e = _d.els[i];
     if (width != null) {
       final ratio = width / e.w;
       e = e.copyWith(
         w: width,
-        // Keep shapes / locked-square images proportional unless height is set.
-        h: e.isShape
-            ? e.h * ratio
-            : (e.isImage && height == null && e.h <= 0 ? width : null),
+        // Images without an explicit height stay square when only width slides.
+        // Shapes keep height independent so Width / Height can be set separately.
+        h: e.isImage && height == null && e.h <= 0 ? width : null,
         size: e.isText ? e.size * ratio : null,
       );
     }
     if (height != null && (e.isImage || e.isShape)) {
       e = e.copyWith(h: height);
+    }
+    if (corner != null && e.isShape) {
+      e = e.copyWith(corner: corner.clamp(0, 50));
     }
     if (rotation != null) e = e.copyWith(r: rotation);
     _replace(i, e);
@@ -235,21 +237,21 @@ class EditorCubit extends Cubit<EditorState> {
   /// Typing in the text field (`tx(v)`).
   void typeText(String value) {
     final i = state.selected;
-    if (i < 0) return;
+    if (i < 0 || _d.els[i].locked) return;
     _recordBurst(const Duration(milliseconds: 800));
     _replace(i, _d.els[i].copyWith(text: value));
   }
 
   void changeFontSize(double delta) {
     final e = state.selectedElement;
-    if (e == null) return;
+    if (e == null || e.locked) return;
     updateSelected((e) => e.copyWith(
         size: math.max(8, (e.size + delta).roundToDouble())));
   }
 
   void deleteSelected() {
     final i = state.selected;
-    if (i < 0) return;
+    if (i < 0 || _d.els[i].locked) return;
     _record();
     final els = [..._d.els]..removeAt(i);
     emit(state.copyWith(design: _d.copyWith(els: els), selected: -1));
@@ -257,7 +259,9 @@ class EditorCubit extends Cubit<EditorState> {
 
   void addElement(DesignElement e) {
     _record();
-    final els = [..._d.els, e];
+    // Customer-added layers are always editable.
+    final added = e.locked ? e.copyWith(locked: false) : e;
+    final els = [..._d.els, added];
     emit(state.copyWith(
         design: _d.copyWith(els: els), selected: els.length - 1));
   }
@@ -265,7 +269,7 @@ class EditorCubit extends Cubit<EditorState> {
   /// `addImg(i)`: swap the emoji of the selected image or add a new one.
   void addStockImage(String emoji) {
     final e = state.selectedElement;
-    if (e != null && e.isImage) {
+    if (e != null && e.isImage && !e.locked) {
       updateSelected((e) => e.copyWith(emoji: emoji, clearImage: true));
     } else {
       addElement(DesignElement.image(
@@ -276,7 +280,7 @@ class EditorCubit extends Cubit<EditorState> {
   /// Add / replace with a picture picked from the device gallery.
   void addGalleryImage(Uint8List bytes) {
     final e = state.selectedElement;
-    if (e != null && e.isImage) {
+    if (e != null && e.isImage && !e.locked) {
       updateSelected((e) => e.copyWith(
             image: bytes,
             photo: true,
@@ -298,14 +302,21 @@ class EditorCubit extends Cubit<EditorState> {
   /// `swap(id)`: apply another template's look to the current design.
   void swapTemplate(DesignModel template) {
     _record();
+    final hasArt = template.bi != null ||
+        (template.biPath != null && template.biPath!.isNotEmpty);
+    // Keep customer-added (unlocked) layers; replace the published base.
+    final extras = [for (final e in _d.els) if (!e.locked) e];
+    final base = hasArt
+        ? const <DesignElement>[]
+        : [for (final e in template.els) e.copyWith(locked: true)];
     emit(state.copyWith(
       design: _d.copyWith(
           bg: template.bg,
           bi: template.bi,
           biPath: template.biPath,
           sourceId: template.id,
-          clearBi: template.bi == null,
-          els: template.els),
+          clearBi: template.bi == null && template.biPath == null,
+          els: [...base, ...extras]),
       selected: -1,
     ));
   }
@@ -315,7 +326,7 @@ class EditorCubit extends Cubit<EditorState> {
   Future<bool> removeBackground() async {
     final i = state.selected;
     final e = state.selectedElement;
-    if (e == null || !e.isImage || !e.photo) return false;
+    if (e == null || e.locked || !e.isImage || !e.photo) return false;
     _record();
     emit(state.copyWith(removingBackground: true));
     try {
@@ -368,6 +379,10 @@ class EditorCubit extends Cubit<EditorState> {
       return;
     }
     final e = d.els[hit.index];
+    if (e.locked) {
+      if (inside) deselect();
+      return;
+    }
     final box = ElementGeometry.boxOf(e, n);
     // Drag deltas use global coordinates so they stay stable even when the
     // stage resizes because the property panel appears.

@@ -67,28 +67,20 @@ class StudioForm {
   }
 
   /// Builds the preview / published design (`bt()` in the artifact).
+  ///
+  /// When a background picture is uploaded it *is* the published artwork —
+  /// do not stack headline/subtitle layers on top (that caused double text
+  /// in the customer app). Gradient-only uploads still use generated layers.
   DesignModel toDesign(int id, List<List<Color>> presets) {
     const white = Color(0xFFFFFFFF);
-    return DesignModel(
-      id: id,
-      name: name.isEmpty ? 'Untitled' : name,
-      cat: cat,
-      desc: desc,
-      bg: gradient >= 0 && gradient < presets.length
-          ? presets[gradient]
-          : (customBg ?? const [Color(0xFF8A6A00), Color(0xFFEFBF05)]),
-      bi: bgImage,
-      by: 'You',
-      pm: premium,
-      cost: premium ? cost : 0,
-      els: [
-        if (bgImage != null)
-          const DesignElement.shape(
-              x: 0,
-              y: 0,
-              w: 100,
-              h: 100,
-              fill: Color.fromRGBO(0, 0, 0, .35)),
+    final bg = gradient >= 0 && gradient < presets.length
+        ? presets[gradient]
+        : (customBg ?? const [Color(0xFF8A6A00), Color(0xFFEFBF05)]);
+    final List<DesignElement> els;
+    if (bgImage != null) {
+      els = const [];
+    } else {
+      els = [
         DesignElement.text(
             x: 8,
             y: 9,
@@ -108,23 +100,43 @@ class StudioForm {
             shape: ShapeStyle.pill),
         DesignElement.text(
             x: 12, y: 79.6, w: 76, text: subtitle, size: 18, color: white),
-      ],
+      ];
+    }
+    return DesignModel(
+      id: id,
+      name: name.isEmpty ? 'Untitled' : name,
+      cat: cat,
+      desc: desc,
+      bg: bg,
+      bi: bgImage,
+      by: 'You',
+      pm: premium,
+      cost: premium ? cost : 0,
+      els: els,
     );
   }
 
   /// Fills the form from an existing design (`eu(id)`).
   factory StudioForm.fromDesign(DesignModel d, List<List<Color>> presets) {
     final texts = d.els.where((e) => e.isText).toList();
-    final image = d.els.firstWhere((e) => e.isImage);
+    DesignElement? image;
+    for (final e in d.els) {
+      if (e.isImage) {
+        image = e;
+        break;
+      }
+    }
     final g = presets.indexWhere((b) => b.first == d.bg.first);
     return StudioForm(
       name: d.name,
       cat: d.cat,
       desc: d.desc,
-      headline: texts.first.text,
-      subtitle: texts.last.text,
-      emoji: image.emoji,
-      mainImage: image.image,
+      headline: texts.isNotEmpty ? texts.first.text : 'Your\nHeadline',
+      subtitle: texts.length > 1
+          ? texts.last.text
+          : (texts.isNotEmpty ? texts.first.text : 'Your subtitle'),
+      emoji: image?.emoji ?? '🎉',
+      mainImage: image?.image,
       gradient: g,
       customBg: d.bg,
       bgImage: d.bi,

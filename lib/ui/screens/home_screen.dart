@@ -31,22 +31,6 @@ class HomeScreen extends StatelessWidget {
           builder: (context, settings) {
             final t = settings.t;
             return ListView(padding: EdgeInsets.zero, children: [
-              // Search bar
-              Tap(
-                onTap: () => context.app.tab(AppView.search),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: pal.c,
-                    border: Border.all(color: pal.ln),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text('⌕ ${t('ph')}',
-                      style: TextStyle(color: pal.mu)),
-                ),
-              ),
               const _CoinsChip(),
               _BannerPager(lang: settings.lang),
               SectionTitle(t('cat'), top: 6),
@@ -77,6 +61,24 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
             ]);
           },
+        ),
+      ),
+      // Search bar pinned above the bottom tabs.
+      Tap(
+        onTap: () => context.app.tab(AppView.search),
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: pal.c,
+            border: Border.all(color: pal.ln),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            '⌕ ${context.watch<SettingsCubit>().state.t('ph')}',
+            style: TextStyle(color: pal.mu),
+          ),
         ),
       ),
       const BottomTabs(),

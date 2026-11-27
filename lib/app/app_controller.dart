@@ -401,12 +401,21 @@ class AppController {
       }
       return;
     }
+    // Published picture is the fixed base. Customers only add new layers on
+    // top — never edit the original template text/shapes (avoids double text
+    // when the JPG already contains the design).
+    final hasArt = d.bi != null ||
+        (d.biPath != null && d.biPath!.isNotEmpty);
+    final baseEls = hasArt
+        ? const <DesignElement>[]
+        : [for (final e in d.els) e.copyWith(locked: true)];
     editor.open(
       d.copyWith(
           id: DateTime.now().millisecondsSinceEpoch,
           sourceId: d.id,
           status: 'Draft',
-          mod: 'Just now'),
+          mod: 'Just now',
+          els: baseEls),
       tool: EditorTool.text,
     );
     nav.go(AppView.editor);
@@ -659,7 +668,7 @@ class AppController {
         try {
           final d = await _withPicture(template);
           final bytes = await exporter.renderJpeg(d,
-              quality: .92, watermark: _downloadWatermarkFor(d));
+              quality: 1, watermark: _downloadWatermarkFor(d));
           final name = d.name.toLowerCase().replaceAll(' ', '_');
           editor.setFileName(name);
           editor.setExportImage(bytes);
@@ -756,5 +765,6 @@ class NewElements {
       w: 60,
       h: 12,
       fill: Color(0xFFFDE68A),
-      shape: ShapeStyle.pill);
+      shape: ShapeStyle.pill,
+      corner: 50);
 }
