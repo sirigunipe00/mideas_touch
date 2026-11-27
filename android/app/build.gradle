@@ -37,6 +37,14 @@ android {
             signingConfig = signingConfigs.debug
         }
     }
+
+    // Extract libonnxruntime.so so dlopen can find it. AGP 8 otherwise
+    // leaves the library inside the apk and the cutout model fails to load.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 flutter {

@@ -44,6 +44,7 @@ dependencies:
   razorpay_flutter: ^1.4.7
   shared_preferences: ^2.5.3
   app_links: 6.3.2
+  image_background_remover: ^1.0.0
 
 dependency_overrides:
   # app_links >= 6.4 / gal >= 2.3 read `flutter.compileSdkVersion` in Android

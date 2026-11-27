@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,7 @@ import 'data/supabase/supabase_catalog_repository.dart';
 import 'data/supabase/supabase_config.dart';
 import 'data/supabase/supabase_dns.dart';
 import 'data/supabase/supabase_user_repository.dart';
+import 'services/background_removal.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,8 @@ Future<void> main() async {
   installSupabaseDns(SupabaseConfig.url);
   await SupabaseConfig.initialize();
   final client = Supabase.instance.client;
+  // Load the cutout model while the first screen appears.
+  unawaited(BackgroundRemoval.ensureReady());
   runApp(MideaTouchApp(
     catalogRepository: SupabaseCatalogRepository(client),
     authRepository: SupabaseAuthRepository(client),
